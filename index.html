@@ -1,155 +1,737 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>HireLink - College Placement System</title>
-    <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 30px; background-color: #f8fafc; color: #334155; }
-        h1, h2 { color: #1e293b; }
-        .container { display: flex; gap: 30px; flex-wrap: wrap; }
-        .card { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); width: 450px; }
-        .form-group { margin-bottom: 12px; }
-        label { display: block; font-weight: 600; margin-bottom: 4px; }
-        input, select { width: 95%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; }
-        button { background-color: #2563eb; color: white; border: none; padding: 10px 16px; border-radius: 4px; font-weight: 600; cursor: pointer; }
-        button:hover { background-color: #1d4ed8; }
-        .job-item { border-bottom: 1px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 12px; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HireLink - College Placement & Internship Portal</title>
+<style>
+  :root {
+    --bg:#f4f6fb; --card:#ffffff; --ink:#1e293b; --muted:#64748b; --line:#e2e8f0;
+    --brand:#2563eb; --brand-dark:#1d4ed8; --brand-soft:#dbeafe;
+    --ok:#15803d; --ok-soft:#dcfce7; --warn:#b45309; --warn-soft:#fef3c7; --bad:#b91c1c; --bad-soft:#fee2e2;
+    --gray-soft:#e2e8f0; --radius:10px;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; background:var(--bg); color:var(--ink); }
+  header { background:#0f172a; color:#fff; padding:0 28px; display:flex; align-items:center; gap:28px; flex-wrap:wrap; position:sticky; top:0; z-index:20; }
+  .brand { font-size:1.25rem; font-weight:700; padding:14px 0; letter-spacing:.3px; }
+  .brand span { color:#60a5fa; }
+  nav { display:flex; gap:4px; flex-wrap:wrap; flex:1; }
+  nav button { background:transparent; color:#cbd5e1; border:none; padding:16px 14px; font-size:.95rem; font-weight:600; cursor:pointer; border-bottom:3px solid transparent; border-radius:0; }
+  nav button:hover { color:#fff; background:transparent; }
+  nav button.active { color:#fff; border-bottom-color:#60a5fa; }
+  .conn { font-size:.8rem; color:#cbd5e1; display:flex; align-items:center; gap:6px; }
+  .dot { width:9px; height:9px; border-radius:50%; background:#94a3b8; display:inline-block; }
+  .dot.on { background:#22c55e; } .dot.off { background:#ef4444; }
+  main { padding:24px 28px 60px; max-width:1300px; margin:0 auto; }
+  h2 { margin:0 0 4px; font-size:1.35rem; }
+  .sub { color:var(--muted); margin:0 0 18px; font-size:.92rem; }
+  .card { background:var(--card); border-radius:var(--radius); padding:20px; box-shadow:0 1px 3px rgba(15,23,42,.08); border:1px solid var(--line); }
+  .view { display:none; } .view.show { display:block; }
+  .banner { background:var(--bad-soft); color:var(--bad); border:1px solid #fecaca; padding:12px 16px; border-radius:8px; margin-bottom:16px; display:none; align-items:center; justify-content:space-between; gap:12px; }
+  .banner.show { display:flex; }
+
+  button { background:var(--brand); color:#fff; border:none; padding:9px 14px; border-radius:6px; font-weight:600; cursor:pointer; font-size:.88rem; font-family:inherit; }
+  button:hover { background:var(--brand-dark); }
+  button:disabled { opacity:.55; cursor:not-allowed; }
+  button.ghost { background:#fff; color:var(--brand); border:1px solid var(--brand); }
+  button.ghost:hover { background:var(--brand-soft); }
+  button.good { background:var(--ok); } button.good:hover { background:#166534; }
+  button.danger { background:#fff; color:var(--bad); border:1px solid #fca5a5; } button.danger:hover { background:var(--bad-soft); }
+  button.sm { padding:5px 9px; font-size:.78rem; }
+  button.plain { background:transparent; color:var(--muted); border:1px solid var(--line); } button.plain:hover { background:var(--gray-soft); }
+
+  label { display:block; font-weight:600; font-size:.85rem; margin-bottom:4px; }
+  input, select, textarea { width:100%; padding:9px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:.92rem; font-family:inherit; background:#fff; color:var(--ink); }
+  input:focus, select:focus, textarea:focus { outline:2px solid var(--brand-soft); border-color:var(--brand); }
+  .fg { margin-bottom:12px; }
+  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .hint { color:var(--muted); font-size:.78rem; margin-top:3px; }
+  .toolbar { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px; align-items:center; }
+  .toolbar input, .toolbar select { width:auto; min-width:200px; }
+
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:14px; margin-bottom:22px; }
+  .kpi { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:16px; }
+  .kpi .n { font-size:1.8rem; font-weight:700; color:var(--brand); }
+  .kpi .l { color:var(--muted); font-size:.84rem; margin-top:2px; }
+
+  .jobs { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px; }
+  .job h3 { margin:0 0 2px; font-size:1.05rem; }
+  .job .co { color:var(--muted); font-size:.88rem; margin-bottom:10px; }
+  .job .meta { display:grid; grid-template-columns:1fr 1fr; gap:6px 12px; font-size:.86rem; margin-bottom:12px; }
+  .job .meta b { display:block; font-size:.72rem; text-transform:uppercase; color:var(--muted); letter-spacing:.4px; }
+  .bar { height:7px; background:var(--gray-soft); border-radius:4px; overflow:hidden; margin:4px 0 12px; }
+  .bar i { display:block; height:100%; background:var(--brand); }
+  .job .actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+
+  .layout2 { display:grid; grid-template-columns:380px 1fr; gap:20px; align-items:start; }
+  @media (max-width:980px) { .layout2 { grid-template-columns:1fr; } }
+
+  .tablewrap { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:.88rem; }
+  th { text-align:left; background:#f8fafc; color:var(--muted); font-size:.74rem; text-transform:uppercase; letter-spacing:.4px; padding:9px 10px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  td { padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:middle; }
+  tr:hover td { background:#fafcff; }
+  td.num, th.num { text-align:right; }
+  td.act { white-space:nowrap; } td.act button { margin:2px 2px 2px 0; }
+  .empty { text-align:center; color:var(--muted); padding:30px 10px; }
+
+  .badge { display:inline-block; padding:2px 9px; border-radius:20px; font-size:.75rem; font-weight:700; text-transform:capitalize; white-space:nowrap; }
+  .b-gray { background:var(--gray-soft); color:#475569; } .b-blue { background:var(--brand-soft); color:var(--brand-dark); }
+  .b-green { background:var(--ok-soft); color:var(--ok); } .b-amber { background:var(--warn-soft); color:var(--warn); } .b-red { background:var(--bad-soft); color:var(--bad); }
+
+  .reportbtns { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:12px; margin-bottom:18px; }
+  .rbtn { text-align:left; background:var(--card); color:var(--ink); border:1px solid var(--line); padding:14px; border-radius:var(--radius); }
+  .rbtn:hover { border-color:var(--brand); background:#f8fbff; }
+  .rbtn.active { border-color:var(--brand); background:var(--brand-soft); }
+  .rbtn b { display:block; margin-bottom:4px; } .rbtn span { font-weight:400; font-size:.8rem; color:var(--muted); }
+
+  #modalBackdrop { position:fixed; inset:0; background:rgba(15,23,42,.55); display:none; align-items:center; justify-content:center; z-index:50; padding:16px; }
+  #modalBackdrop.show { display:flex; }
+  .modal { background:#fff; border-radius:12px; width:100%; max-width:480px; max-height:92vh; overflow:auto; box-shadow:0 20px 50px rgba(0,0,0,.3); }
+  .modal h3 { margin:0; padding:18px 22px; border-bottom:1px solid var(--line); font-size:1.1rem; }
+  #modalBody { padding:18px 22px 6px; }
+  .modal .foot { padding:12px 22px 20px; display:flex; gap:10px; justify-content:flex-end; align-items:center; flex-wrap:wrap; }
+  #modalError { color:var(--bad); font-size:.85rem; padding:0 22px; min-height:0; }
+  .info { background:#f1f5f9; border-radius:8px; padding:10px 12px; font-size:.86rem; margin-bottom:14px; }
+
+  #toasts { position:fixed; right:20px; bottom:20px; display:flex; flex-direction:column; gap:10px; z-index:80; max-width:420px; }
+  .toast { padding:12px 16px; border-radius:8px; color:#fff; font-size:.9rem; box-shadow:0 8px 20px rgba(0,0,0,.25); }
+  .toast.ok { background:#15803d; } .toast.err { background:#b91c1c; }
+  footer { text-align:center; color:var(--muted); font-size:.8rem; padding:10px 0 30px; }
+</style>
 </head>
 <body>
 
-    <h1>HireLink Placement & Internship Portal</h1>
+<header>
+  <div class="brand">Hire<span>Link</span></div>
+  <nav id="nav">
+    <button data-view="dashboard" class="active">Job Openings</button>
+    <button data-view="students">Students</button>
+    <button data-view="applications">Applications</button>
+    <button data-view="interviews">Interviews</button>
+    <button data-view="offers">Offers</button>
+    <button data-view="reports">Reports</button>
+    <button data-view="activity">Activity Log</button>
+  </nav>
+  <div class="conn"><span id="dot" class="dot"></span><span id="connText">connecting...</span></div>
+</header>
 
-    <div class="container">
-        
-        <!-- SECTION 1: Add New Student Form -->
-        <div class="card">
-            <h2>Register New Student</h2>
-            <form id="studentForm">
-                <div class="form-group">
-                    <label>Student ID:</label>
-                    <input type="number" id="student_id" required placeholder="e.g. 301">
-                </div>
-                <div class="form-group">
-                    <label>First Name:</label>
-                    <input type="text" id="first_name" required placeholder="e.g. Neharika">
-                </div>
-                <div class="form-group">
-                    <label>Last Name:</label>
-                    <input type="text" id="last_name" required placeholder="e.g. Thalishetti">
-                </div>
-                <div class="form-group">
-                    <label>Date of Birth:</label>
-                    <input type="date" id="dob" required>
-                </div>
-                <div class="form-group">
-                    <label>Email:</label>
-                    <input type="email" id="email" required placeholder="name@student.college.edu">
-                </div>
-                <div class="form-group">
-                    <label>CGPA:</label>
-                    <input type="number" step="0.01" id="cgpa" required placeholder="e.g. 8.50">
-                </div>
-                <div class="form-group">
-                    <label>Department Code:</label>
-                    <select id="dept_code">
-                        <option value="CSE">CSE</option>
-                        <option value="ECE">ECE</option>
-                        <option value="IT">IT</option>
-                        <option value="MECH">MECH</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Degree Program:</label>
-                    <select id="program_code">
-                        <option value="BTECH_CSE">BTECH_CSE</option>
-                        <option value="BTECH_ECE">BTECH_ECE</option>
-                        <option value="BTECH_IT">BTECH_IT</option>
-                        <option value="BTECH_MECH">BTECH_MECH</option>
-                    </select>
-                </div>
-                <button type="submit">Add Student to Database</button>
-            </form>
-        </div>
+<main>
+  <div id="banner" class="banner"><span id="bannerText"></span><button class="sm" id="retryBtn">Retry</button></div>
 
-        <!-- SECTION 2: Active Job Openings & Apply -->
-        <div class="card">
-            <h2>Active Job Openings</h2>
-            <div id="jobList">Loading jobs from database...</div>
-        </div>
-
+  <!-- ============ JOB OPENINGS ============ -->
+  <section id="view-dashboard" class="view show">
+    <h2>Placement Dashboard</h2>
+    <p class="sub">Live numbers from the database and all job openings. Students apply from here.</p>
+    <div class="kpis" id="kpis"></div>
+    <div class="toolbar">
+      <input id="jobSearch" type="search" placeholder="Search job or company...">
+      <select id="jobDrive"><option value="">All drives</option><option value="open">Open drives only</option></select>
     </div>
+    <div id="jobGrid" class="jobs"><div class="empty">Loading jobs from database...</div></div>
+  </section>
 
-    <script>
-        // 1. Fetch Job Openings from Node Backend
-        async function loadJobs() {
-            try {
-                const response = await fetch('http://localhost:5000/api/jobs');
-                const jobs = await response.json();
+  <!-- ============ STUDENTS ============ -->
+  <section id="view-students" class="view">
+    <h2>Students</h2>
+    <p class="sub">Register a new student and browse the student records.</p>
+    <div class="layout2">
+      <div class="card">
+        <h3 style="margin-top:0">Register New Student</h3>
+        <form id="studentForm" autocomplete="off">
+          <div class="row2">
+            <div class="fg"><label for="s_first">First name</label><input id="s_first" required placeholder="e.g. Neharika"></div>
+            <div class="fg"><label for="s_last">Last name</label><input id="s_last" required placeholder="e.g. Thalishetti"></div>
+          </div>
+          <div class="row2">
+            <div class="fg"><label for="s_id">Student ID</label><input id="s_id" type="number" min="1" placeholder="auto"><div class="hint">Leave empty to auto-generate.</div></div>
+            <div class="fg"><label for="s_dob">Date of birth</label><input id="s_dob" type="date" required></div>
+          </div>
+          <div class="row2">
+            <div class="fg"><label for="s_gender">Gender</label>
+              <select id="s_gender"><option>Female</option><option>Male</option><option>Other</option></select></div>
+            <div class="fg"><label for="s_year">Year of study</label>
+              <select id="s_year"><option>1</option><option>2</option><option>3</option><option selected>4</option></select></div>
+          </div>
+          <div class="fg"><label for="s_email">Email</label><input id="s_email" type="email" required placeholder="name@student.college.edu"></div>
+          <div class="row2">
+            <div class="fg"><label for="s_phone">Phone</label><input id="s_phone" placeholder="10-digit number"></div>
+            <div class="fg"><label for="s_cgpa">CGPA</label><input id="s_cgpa" type="number" step="0.01" min="0" max="10" required placeholder="e.g. 8.50"></div>
+          </div>
+          <div class="row2">
+            <div class="fg"><label for="s_dept">Department</label><select id="s_dept"></select></div>
+            <div class="fg"><label for="s_prog">Degree program</label><select id="s_prog"></select></div>
+          </div>
+          <button type="submit" id="studentSubmit" style="width:100%">Add Student to Database</button>
+        </form>
+      </div>
+      <div class="card">
+        <div class="toolbar">
+          <input id="stuSearch" type="search" placeholder="Search by name, ID or email...">
+          <select id="stuFilter">
+            <option value="">All students</option>
+            <option value="high">High CGPA (8.5 and above)</option>
+            <option value="low">Low CGPA (below 7.0)</option>
+            <option value="placed">Placed</option>
+          </select>
+        </div>
+        <div class="tablewrap"><table>
+          <thead><tr><th>ID</th><th>Name</th><th>Dept</th><th class="num">CGPA</th><th class="num">Age</th><th>Status</th><th class="num">Applications</th><th>Placed</th></tr></thead>
+          <tbody id="stuBody"><tr><td colspan="8" class="empty">Loading...</td></tr></tbody>
+        </table></div>
+        <div class="hint" id="stuCount"></div>
+      </div>
+    </div>
+  </section>
 
-                const jobContainer = document.getElementById('jobList');
-                jobContainer.innerHTML = '';
+  <!-- ============ APPLICATIONS ============ -->
+  <section id="view-applications" class="view">
+    <h2>Applications</h2>
+    <p class="sub">Move each application through the pipeline: stage results, interview, selection, offer. Buttons change with the status.</p>
+    <div class="card">
+      <div class="toolbar">
+        <input id="appSearch" type="search" placeholder="Search student, job or company...">
+        <select id="appStatus">
+          <option value="">All statuses</option><option>submitted</option><option>shortlisted</option>
+          <option>selected</option><option>rejected</option><option>withdrawn</option>
+        </select>
+      </div>
+      <div class="tablewrap"><table>
+        <thead><tr><th>ID</th><th>Student</th><th>Job</th><th>Applied</th><th>Status</th><th>Offer</th><th>Actions</th></tr></thead>
+        <tbody id="appBody"><tr><td colspan="7" class="empty">Loading...</td></tr></tbody>
+      </table></div>
+      <div class="hint" id="appCount"></div>
+    </div>
+  </section>
 
-                jobs.forEach(job => {
-                    jobContainer.innerHTML += `
-                        <div class="job-item">
-                            <h3>${job.job_title}</h3>
-                            <p><strong>Min CGPA:</strong> ${job.min_cgpa} | <strong>Package:</strong> ₹${job.salary_package}</p>
-                            <p><strong>Vacancies:</strong> ${job.vacancies}</p>
-                            <button onclick="applyForJob(${job.job_id})">Apply for this Job</button>
-                        </div>
-                    `;
-                });
-            } catch (err) {
-                console.error("Error loading jobs:", err);
-            }
-        }
+  <!-- ============ INTERVIEWS ============ -->
+  <section id="view-interviews" class="view">
+    <h2>Interviews</h2>
+    <p class="sub">Interviews are scheduled from the Applications tab. Record the outcome here.</p>
+    <div class="card">
+      <div class="toolbar">
+        <select id="ivFilter"><option value="">All interviews</option><option value="scheduled">Waiting for result</option><option value="done">Completed</option></select>
+      </div>
+      <div class="tablewrap"><table>
+        <thead><tr><th>ID</th><th>Candidate</th><th>Job</th><th>Date</th><th>Time</th><th>Mode / Venue</th><th>Interviewers</th><th>Result</th><th>Action</th></tr></thead>
+        <tbody id="ivBody"><tr><td colspan="9" class="empty">Loading...</td></tr></tbody>
+      </table></div>
+    </div>
+  </section>
 
-        // 2. Handle New Student Registration Form
-        document.getElementById('studentForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
+  <!-- ============ OFFERS ============ -->
+  <section id="view-offers" class="view">
+    <h2>Offers</h2>
+    <p class="sub">Offers are issued from the Applications tab (selected candidates). The student's reply is recorded here.</p>
+    <div class="card">
+      <div class="tablewrap"><table>
+        <thead><tr><th>ID</th><th>Student</th><th>Job</th><th class="num">Package</th><th>Joining</th><th>Location</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody id="offBody"><tr><td colspan="8" class="empty">Loading...</td></tr></tbody>
+      </table></div>
+    </div>
+  </section>
 
-            const studentData = {
-                student_id: document.getElementById('student_id').value,
-                first_name: document.getElementById('first_name').value,
-                last_name: document.getElementById('last_name').value,
-                dob: document.getElementById('dob').value,
-                gender: 'Female',
-                email: document.getElementById('email').value,
-                year_of_study: 4,
-                cgpa: document.getElementById('cgpa').value,
-                dept_code: document.getElementById('dept_code').value,
-                program_code: document.getElementById('program_code').value
-            };
+  <!-- ============ REPORTS ============ -->
+  <section id="view-reports" class="view">
+    <h2>Reports</h2>
+    <p class="sub">Seven analytical queries run live on the database.</p>
+    <div class="reportbtns" id="reportBtns"></div>
+    <div class="card" id="reportCard" style="display:none">
+      <h3 id="reportTitle" style="margin-top:0"></h3>
+      <div class="tablewrap"><table><thead id="reportHead"></thead><tbody id="reportBody"></tbody></table></div>
+    </div>
+  </section>
 
-            const response = await fetch('http://localhost:5000/api/add-student', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(studentData)
-            });
+  <!-- ============ ACTIVITY ============ -->
+  <section id="view-activity" class="view">
+    <h2>Activity Log</h2>
+    <p class="sub">Every change of application status is recorded automatically by a database trigger.</p>
+    <div class="card">
+      <div class="tablewrap"><table>
+        <thead><tr><th>Log</th><th>Application</th><th>Student</th><th>From</th><th>To</th><th>When</th></tr></thead>
+        <tbody id="logBody"><tr><td colspan="6" class="empty">Loading...</td></tr></tbody>
+      </table></div>
+    </div>
+  </section>
+</main>
+<footer>HireLink | CS 257 Database and Information Systems Lab | Neharika, Dwithi, Krupalini</footer>
 
-            const result = await response.json();
-            alert(result.message || result.error);
-            if (!result.error) document.getElementById('studentForm').reset();
-        });
+<!-- Modal -->
+<div id="modalBackdrop">
+  <form class="modal" id="modalForm" autocomplete="off">
+    <h3 id="modalTitle"></h3>
+    <div id="modalBody"></div>
+    <div id="modalError"></div>
+    <div class="foot">
+      <button type="button" class="plain" id="modalCancel">Cancel</button>
+      <button type="submit" id="modalSubmit">Submit</button>
+    </div>
+  </form>
+</div>
+<div id="toasts"></div>
 
-        // 3. Apply for Job using Student ID
-        async function applyForJob(jobId) {
-            const studentId = prompt("Enter Student ID to apply:");
-            if (!studentId) return;
+<script>
+/* ===================================================================
+   HireLink frontend. Talks to the Node backend (server.js) on port 5000.
+   =================================================================== */
+const API = 'http://localhost:5000/api';
 
-            const response = await fetch('http://localhost:5000/api/apply', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ student_id: parseInt(studentId), job_id: jobId })
-            });
+const state = { jobs: [], students: [], applications: [], offers: [], interviews: [],
+                stages: null, interviewers: null, summary: null, view: 'dashboard' };
 
-            const result = await response.json();
-            alert(result.message || result.error);
-        }
+const DEPARTMENTS = ['CSE', 'ECE', 'EEE', 'MECH', 'CIVIL', 'IT', 'AI_DS', 'MBA'];
+const PROGRAMS = [
+  { code: 'BTECH_CSE', label: 'B.Tech Computer Science', dept: 'CSE' },
+  { code: 'MTECH_CSE', label: 'M.Tech Software Engineering', dept: 'CSE' },
+  { code: 'BTECH_ECE', label: 'B.Tech Electronics', dept: 'ECE' },
+  { code: 'BTECH_EEE', label: 'B.Tech Electrical', dept: 'EEE' },
+  { code: 'BTECH_MECH', label: 'B.Tech Mechanical', dept: 'MECH' },
+  { code: 'BTECH_CIVIL', label: 'B.Tech Civil', dept: 'CIVIL' },
+  { code: 'BTECH_IT', label: 'B.Tech Information Technology', dept: 'IT' },
+  { code: 'MCA', label: 'Master of Computer Applications', dept: 'IT' },
+  { code: 'BTECH_AIDS', label: 'B.Tech AI & Data Science', dept: 'AI_DS' },
+  { code: 'MBA_GEN', label: 'Master of Business Administration', dept: 'MBA' }
+];
+const REPORTS = [
+  { n: 1, title: 'Eligible students per job', desc: 'Active students whose CGPA meets each job\'s minimum.' },
+  { n: 2, title: 'Package statistics by department', desc: 'Average, highest and lowest accepted package.' },
+  { n: 3, title: 'Placement percentage by department', desc: 'How many students of each department are placed.' },
+  { n: 4, title: 'Company-wise hiring summary', desc: 'Drives, openings, applications and offers per company.' },
+  { n: 5, title: 'Selection stage performance', desc: 'Pass / fail counts and average score for each stage.' },
+  { n: 6, title: 'Skill demand vs supply', desc: 'Jobs requiring a skill versus students who have it.' },
+  { n: 7, title: 'Interviewer workload', desc: 'Interviews handled by each interviewer and their results.' }
+];
 
-        // Load jobs when page opens
-        loadJobs();
-    </script>
+/* ---------- small helpers ---------- */
+const $ = id => document.getElementById(id);
+const esc = s => String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g,
+  c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const inr = n => (n === null || n === undefined || n === '' || isNaN(Number(n))) ? '-' : '\u20B9' + Number(n).toLocaleString('en-IN');
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function fmtDate(s) {
+  if (!s) return '-';
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s));
+  return m ? (+m[3]) + ' ' + MONTHS[+m[2] - 1] + ' ' + m[1] : esc(s);
+}
+const fmtTime = s => s ? String(s).slice(0, 5) : '';
+function dateStr(offsetDays) {
+  const d = new Date(); d.setDate(d.getDate() + offsetDays);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+const BADGE = {
+  submitted: 'b-gray', shortlisted: 'b-blue', selected: 'b-green', rejected: 'b-red', withdrawn: 'b-amber',
+  pending: 'b-amber', accepted: 'b-green', scheduled: 'b-blue', passed: 'b-green', failed: 'b-red',
+  no_show: 'b-red', cancelled: 'b-gray', open: 'b-green', closed: 'b-amber', completed: 'b-gray',
+  active: 'b-green', graduated: 'b-gray'
+};
+const badge = s => s ? `<span class="badge ${BADGE[s] || 'b-gray'}">${esc(String(s).replace('_', ' '))}</span>` : '-';
+
+function toast(msg, type) {
+  const t = document.createElement('div');
+  t.className = 'toast ' + (type === 'err' ? 'err' : 'ok');
+  t.textContent = msg;
+  $('toasts').appendChild(t);
+  setTimeout(() => t.remove(), type === 'err' ? 7000 : 4500);
+}
+function setConn(ok) {
+  $('dot').className = 'dot ' + (ok ? 'on' : 'off');
+  $('connText').textContent = ok ? 'connected to MySQL' : 'backend not reachable';
+}
+function showBanner(msg) { $('bannerText').textContent = msg; $('banner').classList.add('show'); }
+function hideBanner() { $('banner').classList.remove('show'); }
+
+/* ---------- API ---------- */
+async function api(path, options) {
+  let res;
+  try { res = await fetch(API + path, options); }
+  catch (e) {
+    setConn(false);
+    throw new Error('Cannot reach the backend at http://localhost:5000. Start it with "npm start" and make sure MySQL is running.');
+  }
+  setConn(true);
+  let data = null;
+  try { data = await res.json(); } catch (e) { data = null; }
+  if (!res.ok || (data && !Array.isArray(data) && data.success === false)) {
+    throw new Error((data && data.error) || 'Request failed (HTTP ' + res.status + ')');
+  }
+  return data;
+}
+const post = (path, body) => api(path, {
+  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+});
+
+async function refreshAll() {
+  try {
+    const [jobs, students, applications, offers, interviews, summary] = await Promise.all([
+      api('/jobs'), api('/students'), api('/applications'), api('/offers'), api('/interviews'), api('/summary')
+    ]);
+    Object.assign(state, { jobs, students, applications, offers, interviews, summary });
+    hideBanner();
+    renderAll();
+    if (state.view === 'activity') loadActivity();
+  } catch (e) { showBanner(e.message); }
+}
+async function ensureLookups() {
+  if (!state.stages) state.stages = await api('/stages');
+  if (!state.interviewers) state.interviewers = await api('/interviewers');
+}
+
+/* ---------- modal ---------- */
+let modalSubmit = null;
+function openModal(opts) {
+  $('modalTitle').textContent = opts.title;
+  $('modalBody').innerHTML = opts.body;
+  $('modalError').textContent = '';
+  $('modalSubmit').textContent = opts.submitLabel || 'Submit';
+  $('modalSubmit').className = opts.danger ? 'danger' : '';
+  modalSubmit = opts.onSubmit;
+  $('modalBackdrop').classList.add('show');
+  const first = $('modalBody').querySelector('input:not([type=hidden]), select, textarea');
+  if (first) first.focus();
+  if (opts.onOpen) opts.onOpen();
+}
+function closeModal() { $('modalBackdrop').classList.remove('show'); modalSubmit = null; }
+$('modalCancel').addEventListener('click', closeModal);
+$('modalBackdrop').addEventListener('mousedown', e => { if (e.target === $('modalBackdrop')) closeModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+$('modalForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  if (!modalSubmit) return;
+  const btn = $('modalSubmit');
+  btn.disabled = true; $('modalError').textContent = '';
+  try { await modalSubmit(); }
+  catch (err) { $('modalError').textContent = err.message; }
+  finally { btn.disabled = false; }
+});
+// runs one transaction on the backend, then closes the dialog and reloads everything
+async function runAction(path, body) {
+  const r = await post(path, body);
+  closeModal();
+  toast(r.message || 'Done.', 'ok');
+  await refreshAll();
+  return r;
+}
+function confirmBox(title, text, label, path, body, danger) {
+  openModal({ title, body: `<p>${text}</p>`, submitLabel: label, danger: !!danger, onSubmit: () => runAction(path, body) });
+}
+const v = id => $(id).value;
+const optionList = (items, valueKey, labelFn) => items.map(i => `<option value="${esc(i[valueKey])}">${esc(labelFn(i))}</option>`).join('');
+
+/* ---------- navigation ---------- */
+function showView(name) {
+  state.view = name;
+  document.querySelectorAll('.view').forEach(s => s.classList.toggle('show', s.id === 'view-' + name));
+  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('active', b.dataset.view === name));
+  if (name === 'activity') loadActivity();
+}
+$('nav').addEventListener('click', e => { const b = e.target.closest('button[data-view]'); if (b) showView(b.dataset.view); });
+$('retryBtn').addEventListener('click', refreshAll);
+
+/* ---------- render: dashboard ---------- */
+function renderKpis() {
+  const s = state.summary; if (!s) return;
+  const pct = s.active_students ? Math.round(100 * s.placed_students / s.active_students) : 0;
+  const items = [
+    [s.active_students, 'Active students'], [s.open_jobs, 'Openings in open drives'], [s.applications, 'Applications'],
+    [s.pending_offers, 'Offers awaiting reply'], [s.placed_students, 'Students placed'], [pct + '%', 'Placement rate']
+  ];
+  $('kpis').innerHTML = items.map(i => `<div class="kpi"><div class="n">${esc(i[0])}</div><div class="l">${esc(i[1])}</div></div>`).join('');
+}
+function renderJobs() {
+  const q = v('jobSearch').trim().toLowerCase();
+  const onlyOpen = v('jobDrive') === 'open';
+  const list = state.jobs.filter(j =>
+    (!q || (j.job_title + ' ' + j.company_name).toLowerCase().includes(q)) && (!onlyOpen || j.drive_status === 'open'));
+  if (!list.length) { $('jobGrid').innerHTML = '<div class="empty">No job openings match.</div>'; return; }
+  $('jobGrid').innerHTML = list.map(j => {
+    const total = Number(j.vacancies) || 1;
+    const filled = Math.min(total, Number(j.filled_vacancies) || 0);
+    const open = j.drive_status === 'open';
+    return `<div class="card job">
+      <h3>${esc(j.job_title)}</h3>
+      <div class="co">${esc(j.company_name)} ${badge(j.drive_status)}</div>
+      <div class="meta">
+        <div><b>Package</b>${inr(j.salary_package)}</div><div><b>Min CGPA</b>${esc(j.min_cgpa)}</div>
+        <div><b>Location</b>${esc(j.work_location)}</div><div><b>Type</b>${esc(j.employment_type)}</div>
+      </div>
+      <div class="hint">${filled} of ${total} vacancies taken by offers ${Number(j.remaining_vacancies) <= 0 ? '(full)' : ''}</div>
+      <div class="bar"><i style="width:${Math.round(100 * filled / total)}%"></i></div>
+      <div class="actions">
+        <button data-act="apply" data-id="${Number(j.job_id)}" ${open ? '' : 'disabled'}>${open ? 'Apply for this job' : 'Applications closed'}</button>
+        ${open ? `<button class="plain sm" data-act="closeDrive" data-id="${Number(j.drive_id)}">Close drive</button>` : ''}
+      </div></div>`;
+  }).join('');
+}
+
+/* ---------- render: students ---------- */
+function renderStudents() {
+  const q = v('stuSearch').trim().toLowerCase(), f = v('stuFilter');
+  const list = state.students.filter(s => {
+    const text = (s.student_id + ' ' + s.first_name + ' ' + s.last_name + ' ' + s.email).toLowerCase();
+    if (q && !text.includes(q)) return false;
+    if (f === 'high') return Number(s.cgpa) >= 8.5;
+    if (f === 'low') return Number(s.cgpa) < 7;
+    if (f === 'placed') return Number(s.offers_accepted) > 0;
+    return true;
+  });
+  $('stuBody').innerHTML = list.length ? list.map(s => `<tr>
+      <td>${esc(s.student_id)}</td><td>${esc(s.first_name)} ${esc(s.last_name)}</td><td>${esc(s.dept_code)}</td>
+      <td class="num">${Number(s.cgpa).toFixed(2)}</td><td class="num">${esc(s.age)}</td><td>${badge(s.academic_status)}</td>
+      <td class="num">${esc(s.total_applications)}</td><td>${Number(s.offers_accepted) > 0 ? badge('accepted') : '-'}</td></tr>`).join('')
+    : '<tr><td colspan="8" class="empty">No students match.</td></tr>';
+  $('stuCount').textContent = list.length + ' of ' + state.students.length + ' students shown';
+}
+
+/* ---------- render: applications ---------- */
+function appActions(a) {
+  const id = Number(a.application_id), b = [];
+  if (a.application_status === 'submitted' || a.application_status === 'shortlisted')
+    b.push(`<button class="sm ghost" data-act="stage" data-id="${id}">Record stage</button>`);
+  if (a.application_status === 'shortlisted') {
+    b.push(`<button class="sm ghost" data-act="schedule" data-id="${id}">Schedule interview</button>`);
+    b.push(`<button class="sm good" data-act="select" data-id="${id}">Select</button>`);
+  }
+  if (a.application_status === 'selected' && !a.offer_id)
+    b.push(`<button class="sm good" data-act="issueOffer" data-id="${id}">Issue offer</button>`);
+  if (['submitted', 'shortlisted', 'selected'].includes(a.application_status) && a.offer_status !== 'accepted')
+    b.push(`<button class="sm danger" data-act="withdraw" data-id="${id}">Withdraw</button>`);
+  return b.length ? b.join('') : '-';
+}
+function renderApplications() {
+  const q = v('appSearch').trim().toLowerCase(), st = v('appStatus');
+  const list = state.applications.filter(a =>
+    (!st || a.application_status === st) &&
+    (!q || (a.student_name + ' ' + a.job_title + ' ' + a.company_name + ' ' + a.application_id + ' ' + a.student_id).toLowerCase().includes(q)));
+  $('appBody').innerHTML = list.length ? list.map(a => `<tr>
+      <td>#${esc(a.application_id)}</td>
+      <td>${esc(a.student_name)}<div class="hint">ID ${esc(a.student_id)}</div></td>
+      <td>${esc(a.job_title)}<div class="hint">${esc(a.company_name)}</div></td>
+      <td>${fmtDate(a.application_date)}</td><td>${badge(a.application_status)}</td>
+      <td>${a.offer_status ? badge(a.offer_status) : '-'}</td><td class="act">${appActions(a)}</td></tr>`).join('')
+    : '<tr><td colspan="7" class="empty">No applications match.</td></tr>';
+  $('appCount').textContent = list.length + ' of ' + state.applications.length + ' applications shown';
+}
+
+/* ---------- render: interviews & offers ---------- */
+function renderInterviews() {
+  const f = v('ivFilter');
+  const list = state.interviews.filter(i => !f || (f === 'scheduled' ? i.result === 'scheduled' : i.result !== 'scheduled'));
+  $('ivBody').innerHTML = list.length ? list.map(i => `<tr>
+      <td>#${esc(i.interview_id)}</td>
+      <td>${esc(i.student_name)}<div class="hint">Application #${esc(i.application_id)}</div></td>
+      <td>${esc(i.job_title)}<div class="hint">${esc(i.company_name)}</div></td>
+      <td>${fmtDate(i.interview_date)}</td><td>${fmtTime(i.start_time)} - ${fmtTime(i.end_time)}</td>
+      <td>${esc(i.interview_mode)}<div class="hint">${esc(i.venue_or_link)}</div></td>
+      <td>${esc(i.interviewers) || '-'}</td><td>${badge(i.result)}</td>
+      <td class="act">${i.result === 'scheduled' ? `<button class="sm" data-act="ivResult" data-id="${Number(i.interview_id)}">Record result</button>` : '-'}</td></tr>`).join('')
+    : '<tr><td colspan="9" class="empty">No interviews to show.</td></tr>';
+}
+function renderOffers() {
+  $('offBody').innerHTML = state.offers.length ? state.offers.map(o => `<tr>
+      <td>#${esc(o.offer_id)}</td>
+      <td>${esc(o.student_name)}<div class="hint">Application #${esc(o.application_id)}</div></td>
+      <td>${esc(o.job_title)}<div class="hint">${esc(o.company_name)}</div></td>
+      <td class="num">${inr(o.salary_package)}</td><td>${fmtDate(o.joining_date)}</td><td>${esc(o.job_location)}</td>
+      <td>${badge(o.job_status)}</td>
+      <td class="act">${o.job_status === 'pending'
+        ? `<button class="sm good" data-act="accept" data-id="${Number(o.offer_id)}">Accept</button><button class="sm danger" data-act="reject" data-id="${Number(o.offer_id)}">Reject</button>` : '-'}</td></tr>`).join('')
+    : '<tr><td colspan="8" class="empty">No offers yet.</td></tr>';
+}
+function renderAll() { renderKpis(); renderJobs(); renderStudents(); renderApplications(); renderInterviews(); renderOffers(); }
+
+async function loadActivity() {
+  try {
+    const rows = await api('/audit');
+    $('logBody').innerHTML = rows.length ? rows.map(r => `<tr>
+        <td>${esc(r.log_id)}</td><td>#${esc(r.application_id)}</td><td>${esc(r.student_name)}</td>
+        <td>${badge(r.old_status)}</td><td>${badge(r.new_status)}</td>
+        <td>${fmtDate(r.changed_at)} ${esc(String(r.changed_at || '').slice(11, 16))}</td></tr>`).join('')
+      : '<tr><td colspan="6" class="empty">No status changes yet. Do an action (record a stage result, select a candidate...) and it will appear here.</td></tr>';
+  } catch (e) { $('logBody').innerHTML = `<tr><td colspan="6" class="empty">${esc(e.message)}</td></tr>`; }
+}
+
+/* ---------- reports ---------- */
+function renderReportButtons() {
+  $('reportBtns').innerHTML = REPORTS.map(r =>
+    `<button class="rbtn" id="rbtn${r.n}" data-act="report" data-id="${r.n}"><b>${r.n}. ${esc(r.title)}</b><span>${esc(r.desc)}</span></button>`).join('');
+}
+function fmtCell(key, val) {
+  if (val === null || val === undefined) return '-';
+  if (/package|salary/.test(key)) return inr(val);
+  if (/percent/.test(key)) return esc(val) + '%';
+  return esc(val);
+}
+async function loadReport(n) {
+  document.querySelectorAll('.rbtn').forEach(b => b.classList.remove('active'));
+  $('rbtn' + n).classList.add('active');
+  const meta = REPORTS.find(r => r.n === n);
+  $('reportCard').style.display = 'block';
+  $('reportTitle').textContent = 'Report ' + n + ': ' + meta.title;
+  $('reportHead').innerHTML = ''; $('reportBody').innerHTML = '<tr><td class="empty">Running query...</td></tr>';
+  try {
+    const rows = await api('/report/' + n);
+    if (!rows.length) { $('reportBody').innerHTML = '<tr><td class="empty">This query returned no rows.</td></tr>'; return; }
+    const keys = Object.keys(rows[0]);
+    const numeric = k => rows.every(r => r[k] === null || r[k] === '' || !isNaN(Number(r[k]))) && !/_id$|^stage_id$/.test(k);
+    $('reportHead').innerHTML = '<tr>' + keys.map(k => `<th class="${numeric(k) ? 'num' : ''}">${esc(k.replace(/_/g, ' '))}</th>`).join('') + '</tr>';
+    $('reportBody').innerHTML = rows.map(r => '<tr>' + keys.map(k => `<td class="${numeric(k) ? 'num' : ''}">${fmtCell(k, r[k])}</td>`).join('') + '</tr>').join('');
+  } catch (e) { $('reportBody').innerHTML = `<tr><td class="empty">${esc(e.message)}</td></tr>`; }
+}
+
+/* ---------- student registration ---------- */
+function fillProgramList() {
+  const d = v('s_dept');
+  $('s_prog').innerHTML = PROGRAMS.filter(p => p.dept === d).map(p => `<option value="${p.code}">${esc(p.label)} (${p.code})</option>`).join('');
+}
+$('s_dept').innerHTML = DEPARTMENTS.map(d => `<option>${d}</option>`).join('');
+$('s_dept').addEventListener('change', fillProgramList);
+fillProgramList();
+
+$('studentForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn = $('studentSubmit'); btn.disabled = true;
+  try {
+    const r = await post('/add-student', {
+      student_id: v('s_id') || null, first_name: v('s_first'), last_name: v('s_last'), dob: v('s_dob'),
+      gender: v('s_gender'), email: v('s_email'), phone: v('s_phone'), year_of_study: v('s_year'),
+      cgpa: v('s_cgpa'), dept_code: v('s_dept'), program_code: v('s_prog')
+    });
+    toast(r.message, 'ok');
+    $('studentForm').reset(); fillProgramList();
+    await refreshAll();
+  } catch (err) { toast(err.message, 'err'); }
+  finally { btn.disabled = false; }
+});
+
+/* ---------- dialogs for each transaction ---------- */
+function openApply(jobId) {
+  const job = state.jobs.find(j => Number(j.job_id) === jobId); if (!job) return;
+  openModal({
+    title: 'Apply: ' + job.job_title,
+    submitLabel: 'Submit application',
+    body: `<div class="info"><b>${esc(job.company_name)}</b> | ${esc(job.work_location)} | ${inr(job.salary_package)} | minimum CGPA ${esc(job.min_cgpa)}</div>
+      <div class="fg"><label for="f_student">Student ID</label>
+        <input id="f_student" type="number" list="studentList" required placeholder="e.g. 101">
+        <datalist id="studentList">${state.students.map(s => `<option value="${esc(s.student_id)}">${esc(s.first_name)} ${esc(s.last_name)} (${esc(s.dept_code)}, CGPA ${esc(s.cgpa)})</option>`).join('')}</datalist>
+        <div class="hint">Eligibility, open drive and duplicate applications are checked by the database.</div></div>`,
+    onSubmit: () => runAction('/apply', { student_id: v('f_student'), job_id: jobId })
+  });
+}
+async function openStage(appId) {
+  const a = state.applications.find(x => Number(x.application_id) === appId); if (!a) return;
+  try { await ensureLookups(); } catch (e) { toast(e.message, 'err'); return; }
+  openModal({
+    title: 'Record stage result',
+    submitLabel: 'Save result',
+    body: `<div class="info">Application #${appId}: <b>${esc(a.student_name)}</b> for ${esc(a.job_title)} (${esc(a.company_name)})</div>
+      <div class="fg"><label for="f_stage">Selection stage</label>
+        <select id="f_stage">${optionList(state.stages, 'stage_id', s => s.stage_name + ' (max ' + s.max_score + ')')}</select></div>
+      <div class="row2">
+        <div class="fg"><label for="f_score">Score</label><input id="f_score" type="number" step="0.01" min="0" required>
+          <div class="hint" id="f_scorehint"></div></div>
+        <div class="fg"><label for="f_result">Result</label><select id="f_result"><option value="passed">Passed</option><option value="failed">Failed</option></select></div>
+      </div>
+      <div class="fg"><label for="f_remarks">Remarks (optional)</label><input id="f_remarks" maxlength="255"></div>`,
+    onOpen: () => {
+      const upd = () => {
+        const s = state.stages.find(x => String(x.stage_id) === v('f_stage'));
+        if (s) { $('f_score').max = s.max_score; $('f_scorehint').textContent = 'Maximum score: ' + s.max_score; }
+      };
+      $('f_stage').addEventListener('change', upd); upd();
+    },
+    onSubmit: () => runAction('/stage-result', {
+      application_id: appId, stage_id: v('f_stage'), score: v('f_score'), result: v('f_result'), remarks: v('f_remarks')
+    })
+  });
+}
+async function openSchedule(appId) {
+  const a = state.applications.find(x => Number(x.application_id) === appId); if (!a) return;
+  try { await ensureLookups(); } catch (e) { toast(e.message, 'err'); return; }
+  const people = state.interviewers.filter(i => Number(i.company_id) === Number(a.company_id));
+  if (!people.length) { toast('No interviewer is registered for ' + a.company_name + '.', 'err'); return; }
+  openModal({
+    title: 'Schedule interview',
+    submitLabel: 'Schedule',
+    body: `<div class="info">Application #${appId}: <b>${esc(a.student_name)}</b> for ${esc(a.job_title)} (${esc(a.company_name)})</div>
+      <div class="fg"><label for="f_iv">Interviewer</label><select id="f_iv">${optionList(people, 'interviewer_id', i => i.interviewer_name + ' - ' + (i.designation || ''))}</select></div>
+      <div class="row2">
+        <div class="fg"><label for="f_date">Date</label><input id="f_date" type="date" required value="${dateStr(1)}"></div>
+        <div class="fg"><label for="f_mode">Mode</label><select id="f_mode"><option>Online</option><option>Offline</option></select></div>
+      </div>
+      <div class="row2">
+        <div class="fg"><label for="f_start">Start time</label><input id="f_start" type="time" required value="10:00"></div>
+        <div class="fg"><label for="f_end">End time</label><input id="f_end" type="time" required value="11:00"></div>
+      </div>
+      <div class="fg"><label for="f_venue">Venue or meeting link</label><input id="f_venue" maxlength="255" placeholder="Placement Cell Room 2 / meeting link"></div>`,
+    onSubmit: () => runAction('/schedule-interview', {
+      application_id: appId, interview_date: v('f_date'), start_time: v('f_start'), end_time: v('f_end'),
+      interview_mode: v('f_mode'), venue_or_link: v('f_venue'), interviewer_id: v('f_iv')
+    })
+  });
+}
+function openInterviewResult(id) {
+  const i = state.interviews.find(x => Number(x.interview_id) === id); if (!i) return;
+  openModal({
+    title: 'Record interview result',
+    submitLabel: 'Save result',
+    body: `<div class="info">Interview #${id}: <b>${esc(i.student_name)}</b> for ${esc(i.job_title)} on ${fmtDate(i.interview_date)}, ${fmtTime(i.start_time)}</div>
+      <div class="fg"><label for="f_ivres">Outcome</label>
+        <select id="f_ivres"><option value="passed">Passed</option><option value="failed">Failed</option><option value="no_show">Did not attend</option></select>
+        <div class="hint">Passed keeps the candidate in the process. Failed or no-show rejects the application.</div></div>`,
+    onSubmit: () => runAction('/interview-result', { interview_id: id, result: v('f_ivres') })
+  });
+}
+function openIssueOffer(appId) {
+  const a = state.applications.find(x => Number(x.application_id) === appId); if (!a) return;
+  openModal({
+    title: 'Issue offer',
+    submitLabel: 'Issue offer',
+    body: `<div class="info">Application #${appId}: <b>${esc(a.student_name)}</b> for ${esc(a.job_title)} (${esc(a.company_name)}). The package is taken from the job opening.</div>
+      <div class="fg"><label for="f_join">Joining date</label><input id="f_join" type="date" required value="2027-07-01" min="${dateStr(0)}"></div>
+      <div class="fg"><label for="f_loc">Job location</label><input id="f_loc" value="${esc(a.work_location || '')}" maxlength="150"></div>`,
+    onSubmit: () => runAction('/issue-offer', { application_id: appId, joining_date: v('f_join'), job_location: v('f_loc') })
+  });
+}
+
+/* ---------- one click handler for every button ---------- */
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const id = Number(b.dataset.id), act = b.dataset.act;
+  const app = state.applications.find(x => Number(x.application_id) === id);
+  const off = state.offers.find(x => Number(x.offer_id) === id);
+  switch (act) {
+    case 'apply': return openApply(id);
+    case 'closeDrive':
+      return confirmBox('Close recruitment drive', 'This marks drive #' + id + ' as completed and closes every unfinished application of its jobs as rejected. Continue?',
+        'Close drive', '/close-drive', { drive_id: id }, true);
+    case 'stage': return openStage(id);
+    case 'schedule': return openSchedule(id);
+    case 'select':
+      return confirmBox('Select candidate', 'Select <b>' + esc(app ? app.student_name : '') + '</b> (application #' + id + ')? The candidate needs a passed interview and a free vacancy.',
+        'Select', '/select', { application_id: id });
+    case 'issueOffer': return openIssueOffer(id);
+    case 'withdraw':
+      return confirmBox('Withdraw application', 'Withdraw application #' + id + (app ? ' of ' + esc(app.student_name) : '') + '? A pending offer and a scheduled interview will be cancelled.',
+        'Withdraw', '/withdraw', { application_id: id }, true);
+    case 'ivResult': return openInterviewResult(id);
+    case 'accept':
+      return confirmBox('Accept offer', 'Accept offer #' + id + (off ? ' for ' + esc(off.student_name) : '') + '? All other pending offers of this student are cancelled and their other open applications are withdrawn.',
+        'Accept offer', '/accept-offer', { offer_id: id });
+    case 'reject':
+      return confirmBox('Reject offer', 'Reject offer #' + id + (off ? ' of ' + esc(off.student_name) : '') + '? The seat becomes free again.',
+        'Reject offer', '/reject-offer', { offer_id: id }, true);
+    case 'report': return loadReport(id);
+  }
+});
+
+['jobSearch', 'jobDrive'].forEach(i => $(i).addEventListener('input', renderJobs));
+['stuSearch', 'stuFilter'].forEach(i => $(i).addEventListener('input', renderStudents));
+['appSearch', 'appStatus'].forEach(i => $(i).addEventListener('input', renderApplications));
+$('ivFilter').addEventListener('input', renderInterviews);
+
+renderReportButtons();
+refreshAll();
+</script>
 </body>
 </html>
