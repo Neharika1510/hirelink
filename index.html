@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>HireLink - College Placement System</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 30px; background-color: #f8fafc; color: #334155; }
+        h1, h2 { color: #1e293b; }
+        .container { display: flex; gap: 30px; flex-wrap: wrap; }
+        .card { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); width: 450px; }
+        .form-group { margin-bottom: 12px; }
+        label { display: block; font-weight: 600; margin-bottom: 4px; }
+        input, select { width: 95%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; }
+        button { background-color: #2563eb; color: white; border: none; padding: 10px 16px; border-radius: 4px; font-weight: 600; cursor: pointer; }
+        button:hover { background-color: #1d4ed8; }
+        .job-item { border-bottom: 1px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 12px; }
+    </style>
+</head>
+<body>
+
+    <h1>HireLink Placement & Internship Portal</h1>
+
+    <div class="container">
+        
+        <!-- SECTION 1: Add New Student Form -->
+        <div class="card">
+            <h2>Register New Student</h2>
+            <form id="studentForm">
+                <div class="form-group">
+                    <label>Student ID:</label>
+                    <input type="number" id="student_id" required placeholder="e.g. 301">
+                </div>
+                <div class="form-group">
+                    <label>First Name:</label>
+                    <input type="text" id="first_name" required placeholder="e.g. Neharika">
+                </div>
+                <div class="form-group">
+                    <label>Last Name:</label>
+                    <input type="text" id="last_name" required placeholder="e.g. Thalishetti">
+                </div>
+                <div class="form-group">
+                    <label>Date of Birth:</label>
+                    <input type="date" id="dob" required>
+                </div>
+                <div class="form-group">
+                    <label>Email:</label>
+                    <input type="email" id="email" required placeholder="name@student.college.edu">
+                </div>
+                <div class="form-group">
+                    <label>CGPA:</label>
+                    <input type="number" step="0.01" id="cgpa" required placeholder="e.g. 8.50">
+                </div>
+                <div class="form-group">
+                    <label>Department Code:</label>
+                    <select id="dept_code">
+                        <option value="CSE">CSE</option>
+                        <option value="ECE">ECE</option>
+                        <option value="IT">IT</option>
+                        <option value="MECH">MECH</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Degree Program:</label>
+                    <select id="program_code">
+                        <option value="BTECH_CSE">BTECH_CSE</option>
+                        <option value="BTECH_ECE">BTECH_ECE</option>
+                        <option value="BTECH_IT">BTECH_IT</option>
+                        <option value="BTECH_MECH">BTECH_MECH</option>
+                    </select>
+                </div>
+                <button type="submit">Add Student to Database</button>
+            </form>
+        </div>
+
+        <!-- SECTION 2: Active Job Openings & Apply -->
+        <div class="card">
+            <h2>Active Job Openings</h2>
+            <div id="jobList">Loading jobs from database...</div>
+        </div>
+
+    </div>
+
+    <script>
+        // 1. Fetch Job Openings from Node Backend
+        async function loadJobs() {
+            try {
+                const response = await fetch('http://localhost:5000/api/jobs');
+                const jobs = await response.json();
+
+                const jobContainer = document.getElementById('jobList');
+                jobContainer.innerHTML = '';
+
+                jobs.forEach(job => {
+                    jobContainer.innerHTML += `
+                        <div class="job-item">
+                            <h3>${job.job_title}</h3>
+                            <p><strong>Min CGPA:</strong> ${job.min_cgpa} | <strong>Package:</strong> ₹${job.salary_package}</p>
+                            <p><strong>Vacancies:</strong> ${job.vacancies}</p>
+                            <button onclick="applyForJob(${job.job_id})">Apply for this Job</button>
+                        </div>
+                    `;
+                });
+            } catch (err) {
+                console.error("Error loading jobs:", err);
+            }
+        }
+
+        // 2. Handle New Student Registration Form
+        document.getElementById('studentForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const studentData = {
+                student_id: document.getElementById('student_id').value,
+                first_name: document.getElementById('first_name').value,
+                last_name: document.getElementById('last_name').value,
+                dob: document.getElementById('dob').value,
+                gender: 'Female',
+                email: document.getElementById('email').value,
+                year_of_study: 4,
+                cgpa: document.getElementById('cgpa').value,
+                dept_code: document.getElementById('dept_code').value,
+                program_code: document.getElementById('program_code').value
+            };
+
+            const response = await fetch('http://localhost:5000/api/add-student', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(studentData)
+            });
+
+            const result = await response.json();
+            alert(result.message || result.error);
+            if (!result.error) document.getElementById('studentForm').reset();
+        });
+
+        // 3. Apply for Job using Student ID
+        async function applyForJob(jobId) {
+            const studentId = prompt("Enter Student ID to apply:");
+            if (!studentId) return;
+
+            const response = await fetch('http://localhost:5000/api/apply', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ student_id: parseInt(studentId), job_id: jobId })
+            });
+
+            const result = await response.json();
+            alert(result.message || result.error);
+        }
+
+        // Load jobs when page opens
+        loadJobs();
+    </script>
+</body>
+</html>
