@@ -1,8 +1,4 @@
--- =====================================================================
--- HireLink  |  01_schema.sql  |  Tables, constraints
--- Run order: 01_schema -> 02_seed -> 03_views_triggers -> 04_procedures -> 05_roles
--- Requires MySQL 8.0.16+ (CHECK constraints are enforced from that version)
--- =====================================================================
+-- HireLink Schema
 DROP DATABASE IF EXISTS college_placement_internship;
 CREATE DATABASE college_placement_internship;
 USE college_placement_internship;
@@ -222,24 +218,3 @@ CREATE TABLE APPLICATION_STATUS_LOG (
     FOREIGN KEY (application_id) REFERENCES APPLICATION(application_id)
 );
 
--- =====================================================================
--- HireLink  |  05_roles.sql  |  Users, roles and privileges
--- Change the passwords before you run this. Requires MySQL 8.
--- =====================================================================
-USE college_placement_internship;
-
-CREATE ROLE IF NOT EXISTS 'student_role';
-GRANT SELECT ON college_placement_internship.JOB_VACANCY_STATUS TO 'student_role';
-GRANT SELECT ON college_placement_internship.JOB_OPENING        TO 'student_role';
-GRANT SELECT ON college_placement_internship.VW_STUDENT_DETAILS TO 'student_role';
-
-CREATE ROLE IF NOT EXISTS 'coordinator_role';
-GRANT SELECT, INSERT, UPDATE ON college_placement_internship.* TO 'coordinator_role';
-GRANT EXECUTE ON college_placement_internship.* TO 'coordinator_role';
-
-CREATE USER IF NOT EXISTS 'admin_user'@'localhost'   IDENTIFIED BY 'ChangeMe_Admin1!';
-CREATE USER IF NOT EXISTS 'student_user'@'localhost' IDENTIFIED BY 'ChangeMe_Student1!';
-
-GRANT ALL PRIVILEGES ON college_placement_internship.* TO 'admin_user'@'localhost';
-GRANT 'student_role' TO 'student_user'@'localhost';
-SET DEFAULT ROLE 'student_role' TO 'student_user'@'localhost';

@@ -120,7 +120,7 @@
 <main>
   <div id="banner" class="banner"><span id="bannerText"></span><button class="sm" id="retryBtn">Retry</button></div>
 
-  <!-- ============ JOB OPENINGS ============ -->
+ 
   <section id="view-dashboard" class="view show">
     <h2>Placement Dashboard</h2>
     <p class="sub">Live numbers from the database and all job openings. Students apply from here.</p>
@@ -132,7 +132,7 @@
     <div id="jobGrid" class="jobs"><div class="empty">Loading jobs from database...</div></div>
   </section>
 
-  <!-- ============ STUDENTS ============ -->
+
   <section id="view-students" class="view">
     <h2>Students</h2>
     <p class="sub">Register a new student and browse the student records.</p>
@@ -185,7 +185,6 @@
     </div>
   </section>
 
-  <!-- ============ APPLICATIONS ============ -->
   <section id="view-applications" class="view">
     <h2>Applications</h2>
     <p class="sub">Move each application through the pipeline: stage results, interview, selection, offer. Buttons change with the status.</p>
@@ -205,7 +204,7 @@
     </div>
   </section>
 
-  <!-- ============ INTERVIEWS ============ -->
+ 
   <section id="view-interviews" class="view">
     <h2>Interviews</h2>
     <p class="sub">Interviews are scheduled from the Applications tab. Record the outcome here.</p>
@@ -220,7 +219,7 @@
     </div>
   </section>
 
-  <!-- ============ OFFERS ============ -->
+
   <section id="view-offers" class="view">
     <h2>Offers</h2>
     <p class="sub">Offers are issued from the Applications tab (selected candidates). The student's reply is recorded here.</p>
@@ -232,7 +231,7 @@
     </div>
   </section>
 
-  <!-- ============ REPORTS ============ -->
+
   <section id="view-reports" class="view">
     <h2>Reports</h2>
     <p class="sub">Seven analytical queries run live on the database.</p>
@@ -243,7 +242,7 @@
     </div>
   </section>
 
-  <!-- ============ ACTIVITY ============ -->
+
   <section id="view-activity" class="view">
     <h2>Activity Log</h2>
     <p class="sub">Every change of application status is recorded automatically by a database trigger.</p>
@@ -257,7 +256,7 @@
 </main>
 <footer>HireLink | CS 257 Database and Information Systems Lab | Neharika, Dwithi, Krupalini</footer>
 
-<!-- Modal -->
+
 <div id="modalBackdrop">
   <form class="modal" id="modalForm" autocomplete="off">
     <h3 id="modalTitle"></h3>
@@ -272,9 +271,7 @@
 <div id="toasts"></div>
 
 <script>
-/* ===================================================================
-   HireLink frontend. Talks to the Node backend (server.js) on port 5000.
-   =================================================================== */
+
 const API = 'http://localhost:5000/api';
 
 const state = { jobs: [], students: [], applications: [], offers: [], interviews: [],
@@ -303,7 +300,6 @@ const REPORTS = [
   { n: 7, title: 'Interviewer workload', desc: 'Interviews handled by each interviewer and their results.' }
 ];
 
-/* ---------- small helpers ---------- */
 const $ = id => document.getElementById(id);
 const esc = s => String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g,
   c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -341,7 +337,7 @@ function setConn(ok) {
 function showBanner(msg) { $('bannerText').textContent = msg; $('banner').classList.add('show'); }
 function hideBanner() { $('banner').classList.remove('show'); }
 
-/* ---------- API ---------- */
+
 async function api(path, options) {
   let res;
   try { res = await fetch(API + path, options); }
@@ -377,7 +373,6 @@ async function ensureLookups() {
   if (!state.interviewers) state.interviewers = await api('/interviewers');
 }
 
-/* ---------- modal ---------- */
 let modalSubmit = null;
 function openModal(opts) {
   $('modalTitle').textContent = opts.title;
@@ -404,7 +399,7 @@ $('modalForm').addEventListener('submit', async e => {
   catch (err) { $('modalError').textContent = err.message; }
   finally { btn.disabled = false; }
 });
-// runs one transaction on the backend, then closes the dialog and reloads everything
+
 async function runAction(path, body) {
   const r = await post(path, body);
   closeModal();
@@ -418,7 +413,6 @@ function confirmBox(title, text, label, path, body, danger) {
 const v = id => $(id).value;
 const optionList = (items, valueKey, labelFn) => items.map(i => `<option value="${esc(i[valueKey])}">${esc(labelFn(i))}</option>`).join('');
 
-/* ---------- navigation ---------- */
 function showView(name) {
   state.view = name;
   document.querySelectorAll('.view').forEach(s => s.classList.toggle('show', s.id === 'view-' + name));
@@ -428,7 +422,7 @@ function showView(name) {
 $('nav').addEventListener('click', e => { const b = e.target.closest('button[data-view]'); if (b) showView(b.dataset.view); });
 $('retryBtn').addEventListener('click', refreshAll);
 
-/* ---------- render: dashboard ---------- */
+
 function renderKpis() {
   const s = state.summary; if (!s) return;
   const pct = s.active_students ? Math.round(100 * s.placed_students / s.active_students) : 0;
@@ -464,7 +458,6 @@ function renderJobs() {
   }).join('');
 }
 
-/* ---------- render: students ---------- */
 function renderStudents() {
   const q = v('stuSearch').trim().toLowerCase(), f = v('stuFilter');
   const list = state.students.filter(s => {
@@ -483,7 +476,7 @@ function renderStudents() {
   $('stuCount').textContent = list.length + ' of ' + state.students.length + ' students shown';
 }
 
-/* ---------- render: applications ---------- */
+
 function appActions(a) {
   const id = Number(a.application_id), b = [];
   if (a.application_status === 'submitted' || a.application_status === 'shortlisted')
@@ -513,7 +506,6 @@ function renderApplications() {
   $('appCount').textContent = list.length + ' of ' + state.applications.length + ' applications shown';
 }
 
-/* ---------- render: interviews & offers ---------- */
 function renderInterviews() {
   const f = v('ivFilter');
   const list = state.interviews.filter(i => !f || (f === 'scheduled' ? i.result === 'scheduled' : i.result !== 'scheduled'));
@@ -551,7 +543,6 @@ async function loadActivity() {
   } catch (e) { $('logBody').innerHTML = `<tr><td colspan="6" class="empty">${esc(e.message)}</td></tr>`; }
 }
 
-/* ---------- reports ---------- */
 function renderReportButtons() {
   $('reportBtns').innerHTML = REPORTS.map(r =>
     `<button class="rbtn" id="rbtn${r.n}" data-act="report" data-id="${r.n}"><b>${r.n}. ${esc(r.title)}</b><span>${esc(r.desc)}</span></button>`).join('');
@@ -579,7 +570,6 @@ async function loadReport(n) {
   } catch (e) { $('reportBody').innerHTML = `<tr><td class="empty">${esc(e.message)}</td></tr>`; }
 }
 
-/* ---------- student registration ---------- */
 function fillProgramList() {
   const d = v('s_dept');
   $('s_prog').innerHTML = PROGRAMS.filter(p => p.dept === d).map(p => `<option value="${p.code}">${esc(p.label)} (${p.code})</option>`).join('');
@@ -604,7 +594,6 @@ $('studentForm').addEventListener('submit', async e => {
   finally { btn.disabled = false; }
 });
 
-/* ---------- dialogs for each transaction ---------- */
 function openApply(jobId) {
   const job = state.jobs.find(j => Number(j.job_id) === jobId); if (!job) return;
   openModal({
@@ -694,7 +683,6 @@ function openIssueOffer(appId) {
   });
 }
 
-/* ---------- one click handler for every button ---------- */
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
   const id = Number(b.dataset.id), act = b.dataset.act;
