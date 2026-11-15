@@ -6,21 +6,21 @@ const path = require('path');
 const app = express();
 app.use(cors());
 app.use(express.json());
-
-//deployment
+// deployment
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 const pool = mysql.createPool({
     host: process.env.DB_HOST || process.env.MYSQLHOST || 'localhost',
     port: Number(process.env.DB_PORT || process.env.MYSQLPORT || 3306),
     user: process.env.DB_USER || process.env.MYSQLUSER || 'root',
-    password: process.env.DB_PASSWORD || process.env.MYSQLPASSWORD || 'password',
+    password: process.env.DB_PASSWORD || process.env.MYSQLPASSWORD || 'PUT_YOUR_MYSQL_PASSWORD_HERE',
     database: process.env.DB_NAME || process.env.MYSQLDATABASE || 'college_placement_internship',
     ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
     waitForConnections: true,
     connectionLimit: 10,
     dateStrings: true          
 });
+
 
 class BadRequest extends Error {}
 
@@ -51,6 +51,47 @@ function friendlyDbError(err) {
     return err.sqlMessage || err.message;
 }
 
+const crypto = require('crypto');
+const SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+if (!process.env.ADMIN_PASSWORD) console.warn('WARNING: ADMIN_PASSWORD is not set. Using the default "admin123". Set ADMIN_PASSWORD before deploying.');
+
+const sha = v => crypto.createHash('sha256').update(String(v)).digest();
+const safeEqual = (a, b) => crypto.timingSafeEqual(sha(a), sha(b));
+function sign(payload) {
+    const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
+    return body + '.' + crypto.createHmac('sha256', SECRET).update(body).digest('base64url');
+}
+function verify(token) {
+    if (!token || token.indexOf('.') < 0) return null;
+    const [body, sig] = token.split('.');
+    const expected = crypto.createHmac('sha256', SECRET).update(body).digest('base64url');
+    if (!safeEqual(sig, expected)) return null;
+    try {
+        const p = JSON.parse(Buffer.from(body, 'base64url').toString());
+        return p.exp && p.exp > Date.now() ? p : null;
+    } catch (e) { return null; }
+}
+app.use((req, res, next) => {
+    const h = req.headers.authorization || '';
+    req.user = verify(h.startsWith('Bearer ') ? h.slice(7) : null);
+    next();
+});
+const needLogin = (req, res, next) =>
+    req.user ? next() : res.status(401).json({ success: false, error: 'Please log in.' });
+const adminOnly = (req, res, next) => {
+    if (!req.user) return res.status(401).json({ success: false, error: 'Please log in.' });
+    if (req.user.role !== 'admin') return res.status(403).json({ success: false, error: 'Only the placement coordinator can do this.' });
+    next();
+};
+const attempts = new Map();   
+function tooManyAttempts(ip) {
+    const now = Date.now(), list = (attempts.get(ip) || []).filter(t => now - t < 15 * 60 * 1000);
+    attempts.set(ip, list);
+    return list.length >= 10;
+}
+function noteFailure(ip) { attempts.set(ip, (attempts.get(ip) || []).concat(Date.now())); }
+
 
 async function callProc(name, args) {
     const conn = await pool.getConnection();
@@ -68,7 +109,7 @@ async function callProc(name, args) {
 function transaction(procName, pickArgs) {
     return async (req, res) => {
         try {
-            const message = await callProc(procName, pickArgs(req.body || {}));
+            const message = await callProc(procName, pickArgs(req.body || {}, req));
             if (message && message.startsWith('SUCCESS')) {
                 return res.json({ success: true, message: message.replace(/^SUCCESS:\s*/, '') });
             }
@@ -91,8 +132,7 @@ function reader(sql) {
     };
 }
 
-//READ APIs
-app.get('/api/jobs', reader(`
+app.get('/api/jobs', needLogin, reader(`
     SELECT j.job_id, j.job_title, j.job_description, j.employment_type, j.work_location,
            j.vacancies, j.min_cgpa, j.salary_package, j.drive_id,
            c.company_name, d.drive_status, d.drive_date,
@@ -103,7 +143,7 @@ app.get('/api/jobs', reader(`
     JOIN JOB_VACANCY_STATUS v ON v.job_id = j.job_id
     ORDER BY j.job_id`));
 
-app.get('/api/students', reader(`
+app.get('/api/students', adminOnly, reader(`
     SELECT v.student_id, v.first_name, v.last_name, v.age, v.gender, v.email, v.cgpa,
            v.academic_status, v.dept_code, v.program_code,
            p.total_applications, p.offers_accepted
@@ -111,7 +151,7 @@ app.get('/api/students', reader(`
     JOIN STUDENT_PLACEMENT_SUMMARY p ON p.student_id = v.student_id
     ORDER BY v.student_id`));
 
-app.get('/api/applications', reader(`
+app.get('/api/applications', adminOnly, reader(`
     SELECT a.application_id, a.application_date, a.application_status,
            s.student_id, CONCAT(s.first_name, ' ', s.last_name) AS student_name,
            j.job_id, j.job_title, j.work_location, d.company_id, c.company_name,
@@ -124,7 +164,7 @@ app.get('/api/applications', reader(`
     LEFT JOIN OFFER o        ON o.application_id = a.application_id
     ORDER BY a.application_id DESC`));
 
-app.get('/api/offers', reader(`
+app.get('/api/offers', adminOnly, reader(`
     SELECT o.offer_id, o.offer_date, o.salary_package, o.joining_date, o.job_location, o.job_status,
            a.application_id, s.student_id, CONCAT(s.first_name, ' ', s.last_name) AS student_name,
            j.job_title, c.company_name
@@ -136,7 +176,8 @@ app.get('/api/offers', reader(`
     JOIN COMPANY c           ON c.company_id = d.company_id
     ORDER BY o.offer_id DESC`));
 
-app.get('/api/interviews', reader(`
+// extra lookups used by the frontend forms
+app.get('/api/interviews', adminOnly, reader(`
     SELECT i.interview_id, i.interview_date, i.start_time, i.end_time, i.interview_mode, i.venue_or_link, i.result,
            a.application_id, CONCAT(s.first_name, ' ', s.last_name) AS student_name, j.job_title, c.company_name,
            GROUP_CONCAT(iv.interviewer_name SEPARATOR ', ') AS interviewers
@@ -152,14 +193,14 @@ app.get('/api/interviews', reader(`
              a.application_id, s.first_name, s.last_name, j.job_title, c.company_name
     ORDER BY (i.result = 'scheduled') DESC, i.interview_date DESC, i.start_time`));
 
-app.get('/api/interviewers', reader(`
+app.get('/api/interviewers', adminOnly, reader(`
     SELECT iv.interviewer_id, iv.interviewer_name, iv.designation, iv.company_id, c.company_name
     FROM INTERVIEWER iv JOIN COMPANY c ON c.company_id = iv.company_id
     ORDER BY c.company_name, iv.interviewer_name`));
 
-app.get('/api/stages', reader(`SELECT stage_id, stage_name, stage_type, max_score FROM SELECTION_STAGE ORDER BY stage_id`));
+app.get('/api/stages', adminOnly, reader(`SELECT stage_id, stage_name, stage_type, max_score FROM SELECTION_STAGE ORDER BY stage_id`));
 
-app.get('/api/audit', reader(`
+app.get('/api/audit', adminOnly, reader(`
     SELECT l.log_id, l.application_id, CONCAT(s.first_name, ' ', s.last_name) AS student_name,
            l.old_status, l.new_status, l.changed_at
     FROM APPLICATION_STATUS_LOG l
@@ -167,7 +208,7 @@ app.get('/api/audit', reader(`
     JOIN STUDENT s     ON s.student_id = a.student_id
     ORDER BY l.log_id DESC LIMIT 50`));
 
-app.get('/api/summary', async (req, res) => {
+app.get('/api/summary', adminOnly, async (req, res) => {
     try {
         const [[r]] = await pool.query(`
             SELECT
@@ -184,7 +225,7 @@ app.get('/api/summary', async (req, res) => {
     }
 });
 
-// REPORT QUERIES
+
 const REPORTS = {
     1: `SELECT j.job_id, j.job_title, c.company_name, j.min_cgpa, COUNT(s.student_id) AS eligible_students
         FROM JOB_OPENING j
@@ -252,7 +293,7 @@ const REPORTS = {
         GROUP BY iv.interviewer_id, iv.interviewer_name, c.company_name
         ORDER BY interviews_assigned DESC, iv.interviewer_name`
 };
-app.get('/api/report/:n', async (req, res) => {
+app.get('/api/report/:n', adminOnly, async (req, res) => {
     const sql = REPORTS[req.params.n];
     if (!sql) return res.status(404).json({ success: false, error: 'Report number must be between 1 and 7.' });
     try {
@@ -263,7 +304,87 @@ app.get('/api/report/:n', async (req, res) => {
     }
 });
 
-//WRITE API: register a student (insert student + phone in one DB transaction) ----------
+app.post('/api/login', async (req, res) => {
+    const ip = req.ip;
+    try {
+        if (tooManyAttempts(ip)) return res.status(429).json({ success: false, error: 'Too many failed attempts. Try again in 15 minutes.' });
+        const b = req.body || {};
+        if (b.role === 'admin') {
+            if (!safeEqual(b.password || '', ADMIN_PASSWORD)) { noteFailure(ip); return res.status(401).json({ success: false, error: 'Wrong admin password.' }); }
+            return res.json({ success: true, role: 'admin', name: 'Placement Coordinator',
+                              token: sign({ role: 'admin', exp: Date.now() + 8 * 3600 * 1000 }) });
+        }
+        const student_id = needInt(b, 'student_id');
+        const dob = needText(b, 'dob');
+        const [rows] = await pool.query('SELECT student_id, first_name, last_name FROM STUDENT WHERE student_id = ? AND dob = ?', [student_id, dob]);
+        if (!rows.length) { noteFailure(ip); return res.status(401).json({ success: false, error: 'Student ID and date of birth do not match.' }); }
+        const st = rows[0];
+        res.json({ success: true, role: 'student', student_id: st.student_id, name: st.first_name + ' ' + st.last_name,
+                   token: sign({ role: 'student', student_id: st.student_id, exp: Date.now() + 8 * 3600 * 1000 }) });
+    } catch (err) {
+        res.status(400).json({ success: false, error: friendlyDbError(err) });
+    }
+});
+
+const studentOnly = (req, res, next) => {
+    if (!req.user) return res.status(401).json({ success: false, error: 'Please log in.' });
+    if (req.user.role !== 'student') return res.status(403).json({ success: false, error: 'Student login required.' });
+    next();
+};
+function mine(sql) {
+    return async (req, res) => {
+        try {
+            const [rows] = await pool.query(sql, [req.user.student_id]);
+            res.json(rows);
+        } catch (err) {
+            res.status(500).json({ success: false, error: friendlyDbError(err) });
+        }
+    };
+}
+app.get('/api/me', studentOnly, mine(`
+    SELECT v.student_id, v.first_name, v.last_name, v.age, v.gender, v.email, v.cgpa, v.academic_status,
+           v.dept_code, v.program_code, p.total_applications, p.offers_accepted
+    FROM VW_STUDENT_DETAILS v JOIN STUDENT_PLACEMENT_SUMMARY p ON p.student_id = v.student_id
+    WHERE v.student_id = ?`));
+
+app.get('/api/my/applications', studentOnly, mine(`
+    SELECT a.application_id, a.application_date, a.application_status, j.job_id, j.job_title, j.work_location,
+           c.company_name, o.offer_id, o.job_status AS offer_status
+    FROM APPLICATION a
+    JOIN JOB_OPENING j       ON j.job_id = a.job_id
+    JOIN RECRUITMENT_DRIVE d ON d.drive_id = j.drive_id
+    JOIN COMPANY c           ON c.company_id = d.company_id
+    LEFT JOIN OFFER o        ON o.application_id = a.application_id
+    WHERE a.student_id = ?
+    ORDER BY a.application_id DESC`));
+
+app.get('/api/my/interviews', studentOnly, mine(`
+    SELECT i.interview_id, i.interview_date, i.start_time, i.end_time, i.interview_mode, i.venue_or_link, i.result,
+           j.job_title, c.company_name, GROUP_CONCAT(iv.interviewer_name SEPARATOR ', ') AS interviewers
+    FROM INTERVIEW i
+    JOIN APPLICATION a       ON a.application_id = i.application_id
+    JOIN JOB_OPENING j       ON j.job_id = a.job_id
+    JOIN RECRUITMENT_DRIVE d ON d.drive_id = j.drive_id
+    JOIN COMPANY c           ON c.company_id = d.company_id
+    LEFT JOIN INTERVIEW_INTERVIEWER ii ON ii.interview_id = i.interview_id
+    LEFT JOIN INTERVIEWER iv           ON iv.interviewer_id = ii.interviewer_id
+    WHERE a.student_id = ?
+    GROUP BY i.interview_id, i.interview_date, i.start_time, i.end_time, i.interview_mode, i.venue_or_link, i.result,
+             j.job_title, c.company_name
+    ORDER BY i.interview_date DESC, i.start_time`));
+
+app.get('/api/my/offers', studentOnly, mine(`
+    SELECT o.offer_id, o.offer_date, o.salary_package, o.joining_date, o.job_location, o.job_status,
+           j.job_title, c.company_name
+    FROM OFFER o
+    JOIN APPLICATION a       ON a.application_id = o.application_id
+    JOIN JOB_OPENING j       ON j.job_id = a.job_id
+    JOIN RECRUITMENT_DRIVE d ON d.drive_id = j.drive_id
+    JOIN COMPANY c           ON c.company_id = d.company_id
+    WHERE a.student_id = ?
+    ORDER BY o.offer_id DESC`));
+
+
 app.post('/api/add-student', async (req, res) => {
     let conn;
     try {
@@ -309,31 +430,48 @@ app.post('/api/add-student', async (req, res) => {
     }
 });
 
-//TRANSACTION APIs (each one = one stored procedure)
-app.post('/api/apply', transaction('Proc_SubmitStudentApplication',
-    b => [needInt(b, 'student_id'), needInt(b, 'job_id'), 'submitted']));
 
-app.post('/api/stage-result', transaction('Proc_RecordStageResult',
+app.post('/api/apply', needLogin, transaction('Proc_SubmitStudentApplication',
+    (b, req) => [req.user.role === 'student' ? req.user.student_id : needInt(b, 'student_id'), needInt(b, 'job_id'), 'submitted']));
+
+app.post('/api/stage-result', adminOnly, transaction('Proc_RecordStageResult',
     b => [needInt(b, 'application_id'), needInt(b, 'stage_id'), numOrNull(b.score), needText(b, 'result'), optText(b, 'remarks')]));
 
-app.post('/api/schedule-interview', transaction('Proc_ScheduleInterview',
+app.post('/api/schedule-interview', adminOnly, transaction('Proc_ScheduleInterview',
     b => [needInt(b, 'application_id'), needText(b, 'interview_date'), needText(b, 'start_time'), needText(b, 'end_time'),
           optText(b, 'interview_mode') || 'Online', optText(b, 'venue_or_link'), needInt(b, 'interviewer_id')]));
 
-app.post('/api/interview-result', transaction('Proc_RecordInterviewResult',
+app.post('/api/interview-result', adminOnly, transaction('Proc_RecordInterviewResult',
     b => [needInt(b, 'interview_id'), needText(b, 'result')]));
 
-app.post('/api/select', transaction('Proc_SelectCandidate',
+app.post('/api/select', adminOnly, transaction('Proc_SelectCandidate',
     b => [needInt(b, 'application_id')]));
 
-app.post('/api/issue-offer', transaction('Proc_IssueOffer',
+app.post('/api/issue-offer', adminOnly, transaction('Proc_IssueOffer',
     b => [needInt(b, 'application_id'), optText(b, 'joining_date'), optText(b, 'job_location')]));
 
-app.post('/api/accept-offer', transaction('Proc_AcceptOffer', b => [needInt(b, 'offer_id')]));
-app.post('/api/reject-offer', transaction('Proc_RejectOffer', b => [needInt(b, 'offer_id')]));
-app.post('/api/withdraw', transaction('Proc_WithdrawApplication', b => [needInt(b, 'application_id')]));
-app.post('/api/close-drive', transaction('Proc_CloseRecruitmentDrive', b => [needInt(b, 'drive_id')]));
 
+async function ownsOffer(req, res, next) {
+    if (req.user.role === 'admin') return next();
+    try {
+        const [r] = await pool.query(`SELECT a.student_id FROM OFFER o JOIN APPLICATION a ON a.application_id = o.application_id
+                                      WHERE o.offer_id = ?`, [needInt(req.body || {}, 'offer_id')]);
+        if (r.length && r[0].student_id === req.user.student_id) return next();
+        return res.status(403).json({ success: false, error: 'This offer does not belong to you.' });
+    } catch (err) { return res.status(400).json({ success: false, error: friendlyDbError(err) }); }
+}
+async function ownsApplication(req, res, next) {
+    if (req.user.role === 'admin') return next();
+    try {
+        const [r] = await pool.query('SELECT student_id FROM APPLICATION WHERE application_id = ?', [needInt(req.body || {}, 'application_id')]);
+        if (r.length && r[0].student_id === req.user.student_id) return next();
+        return res.status(403).json({ success: false, error: 'This application does not belong to you.' });
+    } catch (err) { return res.status(400).json({ success: false, error: friendlyDbError(err) }); }
+}
+app.post('/api/accept-offer', needLogin, ownsOffer, transaction('Proc_AcceptOffer', b => [needInt(b, 'offer_id')]));
+app.post('/api/reject-offer', needLogin, ownsOffer, transaction('Proc_RejectOffer', b => [needInt(b, 'offer_id')]));
+app.post('/api/withdraw', needLogin, ownsApplication, transaction('Proc_WithdrawApplication', b => [needInt(b, 'application_id')]));
+app.post('/api/close-drive', adminOnly, transaction('Proc_CloseRecruitmentDrive', b => [needInt(b, 'drive_id')]));
 
 const PORT = process.env.PORT || 5000;
 pool.query('SELECT 1')

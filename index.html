@@ -13,10 +13,10 @@
   }
   * { box-sizing:border-box; }
   body { margin:0; font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; background:var(--bg); color:var(--ink); }
-  header { background:#0f172a; color:#fff; padding:0 28px; display:flex; align-items:center; gap:28px; flex-wrap:wrap; position:sticky; top:0; z-index:20; }
+  header { background:#0f172a; color:#fff; padding:0 28px; display:flex; align-items:center; gap:28px; justify-content:space-between; flex-wrap:wrap; position:sticky; top:0; z-index:20; }
   .brand { font-size:1.25rem; font-weight:700; padding:14px 0; letter-spacing:.3px; }
   .brand span { color:#60a5fa; }
-  nav { display:flex; gap:4px; flex-wrap:wrap; flex:1; }
+  nav { display:flex; gap:4px; flex-wrap:wrap; flex:1; margin-left:10px; }
   nav button { background:transparent; color:#cbd5e1; border:none; padding:16px 14px; font-size:.95rem; font-weight:600; cursor:pointer; border-bottom:3px solid transparent; border-radius:0; }
   nav button:hover { color:#fff; background:transparent; }
   nav button.active { color:#fff; border-bottom-color:#60a5fa; }
@@ -98,6 +98,26 @@
   #toasts { position:fixed; right:20px; bottom:20px; display:flex; flex-direction:column; gap:10px; z-index:80; max-width:420px; }
   .toast { padding:12px 16px; border-radius:8px; color:#fff; font-size:.9rem; box-shadow:0 8px 20px rgba(0,0,0,.25); }
   .toast.ok { background:#15803d; } .toast.err { background:#b91c1c; }
+  body:not(.authed) nav, body:not(.authed) main, body:not(.authed) footer, body:not(.authed) .userbox { display:none; }
+  .userbox { display:flex; align-items:center; gap:10px; font-size:.85rem; color:#e2e8f0; }
+  .userbox button { background:transparent; border:1px solid #475569; color:#e2e8f0; padding:5px 10px; font-size:.78rem; }
+  .userbox button:hover { background:#1e293b; }
+  .hdr-right { display:flex; align-items:center; gap:18px; }
+  #loginScreen { position:fixed; inset:0; background:linear-gradient(160deg,#0f172a,#1e3a8a); display:none; align-items:center; justify-content:center; z-index:90; padding:16px; overflow:auto; }
+  #loginScreen.show { display:flex; }
+  .loginbox { background:#fff; border-radius:14px; width:100%; max-width:440px; padding:26px 28px 24px; box-shadow:0 25px 60px rgba(0,0,0,.4); }
+  .loginbox .brand { color:var(--ink); padding:0; font-size:1.7rem; }
+  .ltabs { display:flex; gap:6px; margin:6px 0 18px; border-bottom:1px solid var(--line); }
+  .ltabs button { background:transparent; color:var(--muted); border-radius:0; border-bottom:3px solid transparent; padding:9px 10px; }
+  .ltabs button:hover { background:transparent; color:var(--ink); }
+  .ltabs button.active { color:var(--brand); border-bottom-color:var(--brand); }
+  .lpanel { display:none; } .lpanel.show { display:block; }
+  #loginMsg { margin-top:12px; font-size:.86rem; min-height:1.2em; }
+  #loginMsg.err { color:var(--bad); } #loginMsg.ok { color:var(--ok); }
+  .profile dl { display:grid; grid-template-columns:170px 1fr; gap:10px 16px; margin:0; font-size:.92rem; }
+  .profile dt { color:var(--muted); font-weight:600; } .profile dd { margin:0; }
+  .legend { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:14px; font-size:.82rem; color:var(--muted); }
+  .congrats { background:var(--ok-soft); color:var(--ok); border:1px solid #bbf7d0; border-radius:8px; padding:12px 16px; margin-bottom:14px; font-weight:600; }
   footer { text-align:center; color:var(--muted); font-size:.8rem; padding:10px 0 30px; }
 </style>
 </head>
@@ -105,22 +125,17 @@
 
 <header>
   <div class="brand">Hire<span>Link</span></div>
-  <nav id="nav">
-    <button data-view="dashboard" class="active">Job Openings</button>
-    <button data-view="students">Students</button>
-    <button data-view="applications">Applications</button>
-    <button data-view="interviews">Interviews</button>
-    <button data-view="offers">Offers</button>
-    <button data-view="reports">Reports</button>
-    <button data-view="activity">Activity Log</button>
-  </nav>
-  <div class="conn"><span id="dot" class="dot"></span><span id="connText">connecting...</span></div>
+  <nav id="nav"></nav>
+  <div class="hdr-right">
+    <div class="userbox"><span id="whoName"></span><button type="button" id="logoutBtn">Log out</button></div>
+    <div class="conn"><span id="dot" class="dot"></span><span id="connText">connecting...</span></div>
+  </div>
 </header>
 
 <main>
   <div id="banner" class="banner"><span id="bannerText"></span><button class="sm" id="retryBtn">Retry</button></div>
 
- 
+  <!-- ============ JOB OPENINGS ============ -->
   <section id="view-dashboard" class="view show">
     <h2>Placement Dashboard</h2>
     <p class="sub">Live numbers from the database and all job openings. Students apply from here.</p>
@@ -132,37 +147,15 @@
     <div id="jobGrid" class="jobs"><div class="empty">Loading jobs from database...</div></div>
   </section>
 
-
+  <!-- ============ STUDENTS ============ -->
   <section id="view-students" class="view">
     <h2>Students</h2>
-    <p class="sub">Register a new student and browse the student records.</p>
+    <p class="sub">Register a student and browse all student records (coordinator only).</p>
     <div class="layout2">
       <div class="card">
         <h3 style="margin-top:0">Register New Student</h3>
         <form id="studentForm" autocomplete="off">
-          <div class="row2">
-            <div class="fg"><label for="s_first">First name</label><input id="s_first" required placeholder="e.g. Neharika"></div>
-            <div class="fg"><label for="s_last">Last name</label><input id="s_last" required placeholder="e.g. Thalishetti"></div>
-          </div>
-          <div class="row2">
-            <div class="fg"><label for="s_id">Student ID</label><input id="s_id" type="number" min="1" placeholder="auto"><div class="hint">Leave empty to auto-generate.</div></div>
-            <div class="fg"><label for="s_dob">Date of birth</label><input id="s_dob" type="date" required></div>
-          </div>
-          <div class="row2">
-            <div class="fg"><label for="s_gender">Gender</label>
-              <select id="s_gender"><option>Female</option><option>Male</option><option>Other</option></select></div>
-            <div class="fg"><label for="s_year">Year of study</label>
-              <select id="s_year"><option>1</option><option>2</option><option>3</option><option selected>4</option></select></div>
-          </div>
-          <div class="fg"><label for="s_email">Email</label><input id="s_email" type="email" required placeholder="name@student.college.edu"></div>
-          <div class="row2">
-            <div class="fg"><label for="s_phone">Phone</label><input id="s_phone" placeholder="10-digit number"></div>
-            <div class="fg"><label for="s_cgpa">CGPA</label><input id="s_cgpa" type="number" step="0.01" min="0" max="10" required placeholder="e.g. 8.50"></div>
-          </div>
-          <div class="row2">
-            <div class="fg"><label for="s_dept">Department</label><select id="s_dept"></select></div>
-            <div class="fg"><label for="s_prog">Degree program</label><select id="s_prog"></select></div>
-          </div>
+          <div id="studentFormBody"></div>
           <button type="submit" id="studentSubmit" style="width:100%">Add Student to Database</button>
         </form>
       </div>
@@ -185,6 +178,7 @@
     </div>
   </section>
 
+ 
   <section id="view-applications" class="view">
     <h2>Applications</h2>
     <p class="sub">Move each application through the pipeline: stage results, interview, selection, offer. Buttons change with the status.</p>
@@ -204,7 +198,7 @@
     </div>
   </section>
 
- 
+
   <section id="view-interviews" class="view">
     <h2>Interviews</h2>
     <p class="sub">Interviews are scheduled from the Applications tab. Record the outcome here.</p>
@@ -219,7 +213,7 @@
     </div>
   </section>
 
-
+  
   <section id="view-offers" class="view">
     <h2>Offers</h2>
     <p class="sub">Offers are issued from the Applications tab (selected candidates). The student's reply is recorded here.</p>
@@ -253,8 +247,73 @@
       </table></div>
     </div>
   </section>
+
+  <section id="view-myapps" class="view">
+    <h2>My Applications</h2>
+    <p class="sub">Follow your applications. The placement coordinator updates the status after each test and interview.</p>
+    <div class="legend"><span class="badge b-gray">submitted</span> waiting for tests
+      <span class="badge b-blue">shortlisted</span> cleared a stage
+      <span class="badge b-green">selected</span> offer will follow
+      <span class="badge b-red">rejected</span> not continuing
+      <span class="badge b-amber">withdrawn</span> cancelled</div>
+    <div class="card"><div class="tablewrap"><table>
+      <thead><tr><th>ID</th><th>Job</th><th>Applied</th><th>Status</th><th>Offer</th><th>Action</th></tr></thead>
+      <tbody id="myAppBody"><tr><td colspan="6" class="empty">Loading...</td></tr></tbody>
+    </table></div></div>
+  </section>
+
+  <section id="view-myint" class="view">
+    <h2>My Interviews</h2>
+    <p class="sub">Interviews scheduled for you. Results are recorded by the placement coordinator.</p>
+    <div class="card"><div class="tablewrap"><table>
+      <thead><tr><th>Job</th><th>Date</th><th>Time</th><th>Mode / Venue</th><th>Interviewers</th><th>Result</th></tr></thead>
+      <tbody id="myIntBody"><tr><td colspan="6" class="empty">Loading...</td></tr></tbody>
+    </table></div></div>
+  </section>
+
+  <section id="view-myoffers" class="view">
+    <h2>My Offers</h2>
+    <p class="sub">Accept or reject your offers. Accepting one cancels your other offers and open applications.</p>
+    <div id="myOfferNote"></div>
+    <div class="card"><div class="tablewrap"><table>
+      <thead><tr><th>Job</th><th class="num">Package</th><th>Joining</th><th>Location</th><th>Status</th><th>Action</th></tr></thead>
+      <tbody id="myOfferBody"><tr><td colspan="6" class="empty">Loading...</td></tr></tbody>
+    </table></div></div>
+  </section>
+
+  <section id="view-profile" class="view">
+    <h2>My Profile</h2>
+    <p class="sub">Your details as stored in the database.</p>
+    <div class="card profile" id="profileCard">Loading...</div>
+  </section>
 </main>
 <footer>HireLink | CS 257 Database and Information Systems Lab | Neharika, Dwithi, Krupalini</footer>
+
+<div id="loginScreen" class="show">
+  <div class="loginbox">
+    <div class="brand">Hire<span>Link</span></div>
+    <p class="sub" style="margin-bottom:10px">College Placement and Internship Portal</p>
+    <div class="ltabs" id="loginTabs">
+      <button type="button" data-lt="student" class="active">Student login</button>
+      <button type="button" data-lt="register">New student</button>
+      <button type="button" data-lt="admin">Coordinator</button>
+    </div>
+    <form id="studentLogin" class="lpanel show" autocomplete="off">
+      <div class="fg"><label for="l_id">Student ID</label><input id="l_id" type="number" min="1" required placeholder="e.g. 101"></div>
+      <div class="fg"><label for="l_dob">Date of birth</label><input id="l_dob" type="date" required></div>
+      <button type="submit" style="width:100%">Log in</button>
+    </form>
+    <form id="registerForm" class="lpanel" autocomplete="off">
+      <div id="regFormBody"></div>
+      <button type="submit" id="regSubmit" style="width:100%">Register</button>
+    </form>
+    <form id="adminLogin" class="lpanel" autocomplete="off">
+      <div class="fg"><label for="l_pw">Coordinator password</label><input id="l_pw" type="password" required></div>
+      <button type="submit" style="width:100%">Log in as coordinator</button>
+    </form>
+    <div id="loginMsg"></div>
+  </div>
+</div>
 
 
 <div id="modalBackdrop">
@@ -272,10 +331,27 @@
 
 <script>
 
-const API = '/api';
+const API = ((location.protocol === 'http:' || location.protocol === 'https:') &&
+             (location.port === '5000' || location.hostname !== 'localhost')) ? '/api' : 'http://localhost:5000/api';
 
 const state = { jobs: [], students: [], applications: [], offers: [], interviews: [],
-                stages: null, interviewers: null, summary: null, view: 'dashboard' };
+                stages: null, interviewers: null, summary: null, view: 'dashboard',
+                me: null, myApps: [], myInt: [], myOffers: [] };
+
+
+let session = null;
+try { session = JSON.parse(sessionStorage.getItem('hirelink_session') || 'null'); } catch (e) { session = null; }
+const isAdmin = () => !!session && session.role === 'admin';
+const isStudent = () => !!session && session.role === 'student';
+function saveSession(x) {
+  session = x;
+  if (x) sessionStorage.setItem('hirelink_session', JSON.stringify(x)); else sessionStorage.removeItem('hirelink_session');
+}
+const ADMIN_VIEWS = [['dashboard', 'Job Openings'], ['students', 'Students'], ['applications', 'Applications'],
+                     ['interviews', 'Interviews'], ['offers', 'Offers'], ['reports', 'Reports'], ['activity', 'Activity Log']];
+const STUDENT_VIEWS = [['dashboard', 'Job Openings'], ['myapps', 'My Applications'], ['myint', 'My Interviews'],
+                       ['myoffers', 'My Offers'], ['profile', 'My Profile']];
+
 
 const DEPARTMENTS = ['CSE', 'ECE', 'EEE', 'MECH', 'CIVIL', 'IT', 'AI_DS', 'MBA'];
 const PROGRAMS = [
@@ -339,15 +415,19 @@ function hideBanner() { $('banner').classList.remove('show'); }
 
 
 async function api(path, options) {
+  options = options || {};
+  options.headers = Object.assign({}, options.headers || {});
+  if (session && session.token) options.headers['Authorization'] = 'Bearer ' + session.token;
   let res;
   try { res = await fetch(API + path, options); }
   catch (e) {
     setConn(false);
-    throw new Error('Cannot reach the backend at http://localhost:5000. Start it with "npm start" and make sure MySQL is running.');
+    throw new Error('Cannot reach the server. If you run it locally, start it with "npm start" and make sure MySQL is running.');
   }
   setConn(true);
   let data = null;
   try { data = await res.json(); } catch (e) { data = null; }
+  if (res.status === 401 && session) { logout('Your session ended. Please log in again.'); throw new Error('Please log in again.'); }
   if (!res.ok || (data && !Array.isArray(data) && data.success === false)) {
     throw new Error((data && data.error) || 'Request failed (HTTP ' + res.status + ')');
   }
@@ -359,14 +439,21 @@ const post = (path, body) => api(path, {
 
 async function refreshAll() {
   try {
-    const [jobs, students, applications, offers, interviews, summary] = await Promise.all([
-      api('/jobs'), api('/students'), api('/applications'), api('/offers'), api('/interviews'), api('/summary')
-    ]);
-    Object.assign(state, { jobs, students, applications, offers, interviews, summary });
+    if (isAdmin()) {
+      const [jobs, students, applications, offers, interviews, summary] = await Promise.all([
+        api('/jobs'), api('/students'), api('/applications'), api('/offers'), api('/interviews'), api('/summary')
+      ]);
+      Object.assign(state, { jobs, students, applications, offers, interviews, summary });
+    } else if (isStudent()) {
+      const [jobs, me, myApps, myInt, myOffers] = await Promise.all([
+        api('/jobs'), api('/me'), api('/my/applications'), api('/my/interviews'), api('/my/offers')
+      ]);
+      Object.assign(state, { jobs, me: me[0] || null, myApps, myInt, myOffers });
+    } else { return; }
     hideBanner();
     renderAll();
-    if (state.view === 'activity') loadActivity();
-  } catch (e) { showBanner(e.message); }
+    if (isAdmin() && state.view === 'activity') loadActivity();
+  } catch (e) { if (session) showBanner(e.message); }
 }
 async function ensureLookups() {
   if (!state.stages) state.stages = await api('/stages');
@@ -413,11 +500,18 @@ function confirmBox(title, text, label, path, body, danger) {
 const v = id => $(id).value;
 const optionList = (items, valueKey, labelFn) => items.map(i => `<option value="${esc(i[valueKey])}">${esc(labelFn(i))}</option>`).join('');
 
+
+function buildNav() {
+  const list = isAdmin() ? ADMIN_VIEWS : STUDENT_VIEWS;
+  $('nav').innerHTML = list.map(v => `<button data-view="${v[0]}">${v[1]}</button>`).join('');
+}
 function showView(name) {
+  const allowed = (isAdmin() ? ADMIN_VIEWS : isStudent() ? STUDENT_VIEWS : []).map(v => v[0]);
+  if (!allowed.includes(name)) name = 'dashboard';
   state.view = name;
   document.querySelectorAll('.view').forEach(s => s.classList.toggle('show', s.id === 'view-' + name));
   document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('active', b.dataset.view === name));
-  if (name === 'activity') loadActivity();
+  if (name === 'activity' && isAdmin()) loadActivity();
 }
 $('nav').addEventListener('click', e => { const b = e.target.closest('button[data-view]'); if (b) showView(b.dataset.view); });
 $('retryBtn').addEventListener('click', refreshAll);
@@ -442,6 +536,19 @@ function renderJobs() {
     const total = Number(j.vacancies) || 1;
     const filled = Math.min(total, Number(j.filled_vacancies) || 0);
     const open = j.drive_status === 'open';
+    let btn;
+    if (isStudent()) {
+      const applied = state.myApps.some(a => Number(a.job_id) === Number(j.job_id));
+      const cg = state.me ? Number(state.me.cgpa) : null;
+      let label = 'Apply for this job', dis = false;
+      if (!open) { label = 'Applications closed'; dis = true; }
+      else if (applied) { label = 'Already applied'; dis = true; }
+      else if (cg !== null && cg < Number(j.min_cgpa)) { label = 'Not eligible (min CGPA ' + j.min_cgpa + ')'; dis = true; }
+      btn = `<button data-act="apply" data-id="${Number(j.job_id)}" ${dis ? 'disabled' : ''}>${esc(label)}</button>`;
+    } else {
+      btn = `<button data-act="apply" data-id="${Number(j.job_id)}" ${open ? '' : 'disabled'}>${open ? 'Apply for this job' : 'Applications closed'}</button>
+        ${open ? `<button class="plain sm" data-act="closeDrive" data-id="${Number(j.drive_id)}">Close drive</button>` : ''}`;
+    }
     return `<div class="card job">
       <h3>${esc(j.job_title)}</h3>
       <div class="co">${esc(j.company_name)} ${badge(j.drive_status)}</div>
@@ -451,12 +558,10 @@ function renderJobs() {
       </div>
       <div class="hint">${filled} of ${total} vacancies taken by offers ${Number(j.remaining_vacancies) <= 0 ? '(full)' : ''}</div>
       <div class="bar"><i style="width:${Math.round(100 * filled / total)}%"></i></div>
-      <div class="actions">
-        <button data-act="apply" data-id="${Number(j.job_id)}" ${open ? '' : 'disabled'}>${open ? 'Apply for this job' : 'Applications closed'}</button>
-        ${open ? `<button class="plain sm" data-act="closeDrive" data-id="${Number(j.drive_id)}">Close drive</button>` : ''}
-      </div></div>`;
+      <div class="actions">${btn}</div></div>`;
   }).join('');
 }
+
 
 function renderStudents() {
   const q = v('stuSearch').trim().toLowerCase(), f = v('stuFilter');
@@ -475,7 +580,6 @@ function renderStudents() {
     : '<tr><td colspan="8" class="empty">No students match.</td></tr>';
   $('stuCount').textContent = list.length + ' of ' + state.students.length + ' students shown';
 }
-
 
 function appActions(a) {
   const id = Number(a.application_id), b = [];
@@ -506,6 +610,7 @@ function renderApplications() {
   $('appCount').textContent = list.length + ' of ' + state.applications.length + ' applications shown';
 }
 
+
 function renderInterviews() {
   const f = v('ivFilter');
   const list = state.interviews.filter(i => !f || (f === 'scheduled' ? i.result === 'scheduled' : i.result !== 'scheduled'));
@@ -530,7 +635,53 @@ function renderOffers() {
         ? `<button class="sm good" data-act="accept" data-id="${Number(o.offer_id)}">Accept</button><button class="sm danger" data-act="reject" data-id="${Number(o.offer_id)}">Reject</button>` : '-'}</td></tr>`).join('')
     : '<tr><td colspan="8" class="empty">No offers yet.</td></tr>';
 }
-function renderAll() { renderKpis(); renderJobs(); renderStudents(); renderApplications(); renderInterviews(); renderOffers(); }
+function renderMyApps() {
+  $('myAppBody').innerHTML = state.myApps.length ? state.myApps.map(a => `<tr>
+      <td>#${esc(a.application_id)}</td>
+      <td>${esc(a.job_title)}<div class="hint">${esc(a.company_name)}, ${esc(a.work_location)}</div></td>
+      <td>${fmtDate(a.application_date)}</td><td>${badge(a.application_status)}</td>
+      <td>${a.offer_status ? badge(a.offer_status) : '-'}</td>
+      <td class="act">${['submitted', 'shortlisted', 'selected'].includes(a.application_status) && a.offer_status !== 'accepted'
+        ? `<button class="sm danger" data-act="withdraw" data-id="${Number(a.application_id)}">Withdraw</button>` : '-'}</td></tr>`).join('')
+    : '<tr><td colspan="6" class="empty">You have not applied yet. Open "Job Openings" and apply.</td></tr>';
+}
+function renderMyInterviews() {
+  $('myIntBody').innerHTML = state.myInt.length ? state.myInt.map(i => `<tr>
+      <td>${esc(i.job_title)}<div class="hint">${esc(i.company_name)}</div></td>
+      <td>${fmtDate(i.interview_date)}</td><td>${fmtTime(i.start_time)} - ${fmtTime(i.end_time)}</td>
+      <td>${esc(i.interview_mode)}<div class="hint">${esc(i.venue_or_link)}</div></td>
+      <td>${esc(i.interviewers) || '-'}</td><td>${badge(i.result)}</td></tr>`).join('')
+    : '<tr><td colspan="6" class="empty">No interviews scheduled for you yet.</td></tr>';
+}
+function renderMyOffers() {
+  const accepted = state.myOffers.find(o => o.job_status === 'accepted');
+  $('myOfferNote').innerHTML = accepted ? `<div class="congrats">Congratulations! You accepted the offer from ${esc(accepted.company_name)} (${esc(accepted.job_title)}).</div>` : '';
+  $('myOfferBody').innerHTML = state.myOffers.length ? state.myOffers.map(o => `<tr>
+      <td>${esc(o.job_title)}<div class="hint">${esc(o.company_name)}</div></td>
+      <td class="num">${inr(o.salary_package)}</td><td>${fmtDate(o.joining_date)}</td><td>${esc(o.job_location)}</td>
+      <td>${badge(o.job_status)}</td>
+      <td class="act">${o.job_status === 'pending'
+        ? `<button class="sm good" data-act="accept" data-id="${Number(o.offer_id)}">Accept</button><button class="sm danger" data-act="reject" data-id="${Number(o.offer_id)}">Reject</button>` : '-'}</td></tr>`).join('')
+    : '<tr><td colspan="6" class="empty">No offers yet.</td></tr>';
+}
+function renderProfile() {
+  const m = state.me; if (!m) { $('profileCard').textContent = 'Loading...'; return; }
+  const rows = [['Student ID', m.student_id], ['Name', m.first_name + ' ' + m.last_name], ['Email', m.email], ['Gender', m.gender],
+                ['Age', m.age], ['CGPA', Number(m.cgpa).toFixed(2)], ['Department', m.dept_code], ['Program', m.program_code],
+                ['Academic status', m.academic_status], ['Applications made', m.total_applications], ['Offers accepted', m.offers_accepted]];
+  $('profileCard').innerHTML = '<dl>' + rows.map(r => `<dt>${esc(r[0])}</dt><dd>${esc(r[1])}</dd>`).join('') + '</dl>';
+}
+function renderAll() {
+  if (isStudent()) {
+    $('kpis').style.display = 'none';
+    $('view-dashboard').querySelector('h2').textContent = 'Job Openings';
+    $('view-dashboard').querySelector('.sub').textContent = 'Browse openings and apply. The database checks your eligibility.';
+    renderJobs(); renderMyApps(); renderMyInterviews(); renderMyOffers(); renderProfile();
+  } else {
+    $('kpis').style.display = '';
+    renderKpis(); renderJobs(); renderStudents(); renderApplications(); renderInterviews(); renderOffers();
+  }
+}
 
 async function loadActivity() {
   try {
@@ -570,32 +721,124 @@ async function loadReport(n) {
   } catch (e) { $('reportBody').innerHTML = `<tr><td class="empty">${esc(e.message)}</td></tr>`; }
 }
 
-function fillProgramList() {
-  const d = v('s_dept');
-  $('s_prog').innerHTML = PROGRAMS.filter(p => p.dept === d).map(p => `<option value="${p.code}">${esc(p.label)} (${p.code})</option>`).join('');
+function regFormHTML(p, withId) {
+  return `
+    <div class="row2">
+      <div class="fg"><label for="${p}first">First name</label><input id="${p}first" required placeholder="e.g. Neharika"></div>
+      <div class="fg"><label for="${p}last">Last name</label><input id="${p}last" required placeholder="e.g. Thalishetti"></div>
+    </div>
+    <div class="row2">
+      ${withId ? `<div class="fg"><label for="${p}id">Student ID</label><input id="${p}id" type="number" min="1" placeholder="auto"><div class="hint">Leave empty to auto-generate.</div></div>` : ''}
+      <div class="fg"><label for="${p}dob">Date of birth</label><input id="${p}dob" type="date" required>${withId ? '' : '<div class="hint">You will use it to log in.</div>'}</div>
+    </div>
+    <div class="row2">
+      <div class="fg"><label for="${p}gender">Gender</label><select id="${p}gender"><option>Female</option><option>Male</option><option>Other</option></select></div>
+      <div class="fg"><label for="${p}year">Year of study</label><select id="${p}year"><option>1</option><option>2</option><option>3</option><option selected>4</option></select></div>
+    </div>
+    <div class="fg"><label for="${p}email">Email</label><input id="${p}email" type="email" required placeholder="name@student.college.edu"></div>
+    <div class="row2">
+      <div class="fg"><label for="${p}phone">Phone</label><input id="${p}phone" placeholder="10-digit number"></div>
+      <div class="fg"><label for="${p}cgpa">CGPA</label><input id="${p}cgpa" type="number" step="0.01" min="0" max="10" required placeholder="e.g. 8.50"></div>
+    </div>
+    <div class="row2">
+      <div class="fg"><label for="${p}dept">Department</label><select id="${p}dept">${DEPARTMENTS.map(d => `<option>${d}</option>`).join('')}</select></div>
+      <div class="fg"><label for="${p}prog">Degree program</label><select id="${p}prog"></select></div>
+    </div>`;
 }
-$('s_dept').innerHTML = DEPARTMENTS.map(d => `<option>${d}</option>`).join('');
-$('s_dept').addEventListener('change', fillProgramList);
-fillProgramList();
+function fillProgramList(p) {
+  $(p + 'prog').innerHTML = PROGRAMS.filter(x => x.dept === v(p + 'dept')).map(x => `<option value="${x.code}">${esc(x.label)} (${x.code})</option>`).join('');
+}
+function setupRegForm(p, bodyId, withId) {
+  $(bodyId).innerHTML = regFormHTML(p, withId);
+  $(p + 'dept').addEventListener('change', () => fillProgramList(p));
+  fillProgramList(p);
+}
+function registerStudent(p) {
+  return post('/add-student', {
+    student_id: $(p + 'id') ? (v(p + 'id') || null) : null, first_name: v(p + 'first'), last_name: v(p + 'last'), dob: v(p + 'dob'),
+    gender: v(p + 'gender'), email: v(p + 'email'), phone: v(p + 'phone'), year_of_study: v(p + 'year'),
+    cgpa: v(p + 'cgpa'), dept_code: v(p + 'dept'), program_code: v(p + 'prog')
+  });
+}
+setupRegForm('s_', 'studentFormBody', true);
+setupRegForm('r_', 'regFormBody', false);
 
 $('studentForm').addEventListener('submit', async e => {
   e.preventDefault();
   const btn = $('studentSubmit'); btn.disabled = true;
   try {
-    const r = await post('/add-student', {
-      student_id: v('s_id') || null, first_name: v('s_first'), last_name: v('s_last'), dob: v('s_dob'),
-      gender: v('s_gender'), email: v('s_email'), phone: v('s_phone'), year_of_study: v('s_year'),
-      cgpa: v('s_cgpa'), dept_code: v('s_dept'), program_code: v('s_prog')
-    });
+    const r = await registerStudent('s_');
     toast(r.message, 'ok');
-    $('studentForm').reset(); fillProgramList();
+    $('studentForm').reset(); fillProgramList('s_');
     await refreshAll();
   } catch (err) { toast(err.message, 'err'); }
   finally { btn.disabled = false; }
 });
 
+
+function loginMsg(text, kind) { $('loginMsg').textContent = text || ''; $('loginMsg').className = kind || ''; }
+$('loginTabs').addEventListener('click', e => {
+  const b = e.target.closest('button[data-lt]'); if (!b) return;
+  document.querySelectorAll('#loginTabs button').forEach(x => x.classList.toggle('active', x === b));
+  $('studentLogin').classList.toggle('show', b.dataset.lt === 'student');
+  $('registerForm').classList.toggle('show', b.dataset.lt === 'register');
+  $('adminLogin').classList.toggle('show', b.dataset.lt === 'admin');
+  loginMsg('');
+});
+async function doLogin(body) {
+  try {
+    const r = await post('/login', body);
+    saveSession({ token: r.token, role: r.role, name: r.name, student_id: r.student_id || null });
+    loginMsg('');
+    startApp();
+  } catch (err) { loginMsg(err.message, 'err'); }
+}
+$('studentLogin').addEventListener('submit', e => { e.preventDefault(); doLogin({ role: 'student', student_id: v('l_id'), dob: v('l_dob') }); });
+$('adminLogin').addEventListener('submit', e => { e.preventDefault(); doLogin({ role: 'admin', password: v('l_pw') }); });
+$('registerForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn = $('regSubmit'); btn.disabled = true;
+  try {
+    const dob = v('r_dob');
+    const r = await registerStudent('r_');
+    $('registerForm').reset(); fillProgramList('r_');
+    document.querySelector('#loginTabs button[data-lt=student]').click();
+    $('l_id').value = r.student_id; $('l_dob').value = dob;
+    loginMsg('Registered! Your Student ID is ' + r.student_id + '. Press Log in to continue.', 'ok');
+  } catch (err) { loginMsg(err.message, 'err'); }
+  finally { btn.disabled = false; }
+});
+function startApp() {
+  document.body.classList.add('authed');
+  document.body.classList.toggle('role-admin', isAdmin());
+  document.body.classList.toggle('role-student', isStudent());
+  $('loginScreen').classList.remove('show');
+  $('whoName').textContent = session.name + (isAdmin() ? ' (coordinator)' : ' (student)');
+  buildNav();
+  showView('dashboard');
+  refreshAll();
+}
+function logout(message) {
+  saveSession(null);
+  Object.assign(state, { me: null, myApps: [], myInt: [], myOffers: [], jobs: [], students: [], applications: [], offers: [], interviews: [], summary: null });
+  document.body.classList.remove('authed', 'role-admin', 'role-student');
+  $('loginScreen').classList.add('show');
+  closeModal();
+  loginMsg(message || '', message ? 'err' : '');
+}
+$('logoutBtn').addEventListener('click', () => logout(''));
+
 function openApply(jobId) {
   const job = state.jobs.find(j => Number(j.job_id) === jobId); if (!job) return;
+  if (isStudent()) {
+    openModal({
+      title: 'Apply: ' + job.job_title, submitLabel: 'Submit application',
+      body: `<div class="info"><b>${esc(job.company_name)}</b> | ${esc(job.work_location)} | ${inr(job.salary_package)} | minimum CGPA ${esc(job.min_cgpa)}</div>
+             <p>Apply for this job as <b>${esc(session.name)}</b> (ID ${esc(session.student_id)})? The database checks eligibility and duplicates.</p>`,
+      onSubmit: () => runAction('/apply', { job_id: jobId })
+    });
+    return;
+  }
   openModal({
     title: 'Apply: ' + job.job_title,
     submitLabel: 'Submit application',
@@ -683,6 +926,7 @@ function openIssueOffer(appId) {
   });
 }
 
+
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
   const id = Number(b.dataset.id), act = b.dataset.act;
@@ -719,7 +963,7 @@ document.addEventListener('click', e => {
 $('ivFilter').addEventListener('input', renderInterviews);
 
 renderReportButtons();
-refreshAll();
+if (session) startApp();
 </script>
 </body>
 </html>
