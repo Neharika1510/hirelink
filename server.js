@@ -1,30 +1,27 @@
-// =====================================================================
-// HireLink backend  |  Node + Express + MySQL
-// Start:  npm install   then   npm start     (http://localhost:5000)
-// Password: set the environment variable DB_PASSWORD (do NOT commit it to GitHub).
-//   Windows (cmd):         set DB_PASSWORD=yourpassword && npm start
-//   Windows (PowerShell):  $env:DB_PASSWORD="yourpassword"; npm start
-//   Mac/Linux:             DB_PASSWORD=yourpassword npm start
-// =====================================================================
 const express = require('express');
 const mysql = require('mysql2/promise');
 const cors = require('cors');
+const path = require('path');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
+//deployment
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+
 const pool = mysql.createPool({
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || 'PUT_YOUR_MYSQL_PASSWORD_HERE',
-    database: 'college_placement_internship',
+    host: process.env.DB_HOST || process.env.MYSQLHOST || 'localhost',
+    port: Number(process.env.DB_PORT || process.env.MYSQLPORT || 3306),
+    user: process.env.DB_USER || process.env.MYSQLUSER || 'root',
+    password: process.env.DB_PASSWORD || process.env.MYSQLPASSWORD || 'password',
+    database: process.env.DB_NAME || process.env.MYSQLDATABASE || 'college_placement_internship',
+    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
     waitForConnections: true,
     connectionLimit: 10,
-    dateStrings: true          // return DATE/TIME as plain strings (no timezone shifts)
+    dateStrings: true          
 });
 
-// ---------- helpers ----------
 class BadRequest extends Error {}
 
 function needInt(body, key) {
@@ -54,8 +51,7 @@ function friendlyDbError(err) {
     return err.sqlMessage || err.message;
 }
 
-// Runs a stored procedure that has an OUT parameter as its LAST argument.
-// A dedicated connection is used so that @msg belongs to the same session.
+
 async function callProc(name, args) {
     const conn = await pool.getConnection();
     try {
@@ -68,7 +64,7 @@ async function callProc(name, args) {
     }
 }
 
-// Builds an Express handler for one transaction (stored procedure)
+
 function transaction(procName, pickArgs) {
     return async (req, res) => {
         try {
@@ -83,7 +79,7 @@ function transaction(procName, pickArgs) {
     };
 }
 
-// Builds an Express handler for a read-only query
+
 function reader(sql) {
     return async (req, res) => {
         try {
@@ -95,7 +91,7 @@ function reader(sql) {
     };
 }
 
-// ---------- READ APIs ----------
+//READ APIs
 app.get('/api/jobs', reader(`
     SELECT j.job_id, j.job_title, j.job_description, j.employment_type, j.work_location,
            j.vacancies, j.min_cgpa, j.salary_package, j.drive_id,
@@ -140,7 +136,6 @@ app.get('/api/offers', reader(`
     JOIN COMPANY c           ON c.company_id = d.company_id
     ORDER BY o.offer_id DESC`));
 
-// extra lookups used by the frontend forms
 app.get('/api/interviews', reader(`
     SELECT i.interview_id, i.interview_date, i.start_time, i.end_time, i.interview_mode, i.venue_or_link, i.result,
            a.application_id, CONCAT(s.first_name, ' ', s.last_name) AS student_name, j.job_title, c.company_name,
@@ -189,7 +184,7 @@ app.get('/api/summary', async (req, res) => {
     }
 });
 
-// ---------- 7 REPORT QUERIES ----------
+// REPORT QUERIES
 const REPORTS = {
     1: `SELECT j.job_id, j.job_title, c.company_name, j.min_cgpa, COUNT(s.student_id) AS eligible_students
         FROM JOB_OPENING j
@@ -268,7 +263,7 @@ app.get('/api/report/:n', async (req, res) => {
     }
 });
 
-// ---------- WRITE API: register a student (insert student + phone in one DB transaction) ----------
+//WRITE API: register a student (insert student + phone in one DB transaction) ----------
 app.post('/api/add-student', async (req, res) => {
     let conn;
     try {
@@ -314,7 +309,7 @@ app.post('/api/add-student', async (req, res) => {
     }
 });
 
-// ---------- TRANSACTION APIs (each one = one stored procedure) ----------
+//TRANSACTION APIs (each one = one stored procedure)
 app.post('/api/apply', transaction('Proc_SubmitStudentApplication',
     b => [needInt(b, 'student_id'), needInt(b, 'job_id'), 'submitted']));
 
@@ -339,7 +334,7 @@ app.post('/api/reject-offer', transaction('Proc_RejectOffer', b => [needInt(b, '
 app.post('/api/withdraw', transaction('Proc_WithdrawApplication', b => [needInt(b, 'application_id')]));
 app.post('/api/close-drive', transaction('Proc_CloseRecruitmentDrive', b => [needInt(b, 'drive_id')]));
 
-// ---------- start ----------
+
 const PORT = process.env.PORT || 5000;
 pool.query('SELECT 1')
     .then(() => console.log('Connected to MySQL database: college_placement_internship'))
