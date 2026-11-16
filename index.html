@@ -135,7 +135,7 @@
 <main>
   <div id="banner" class="banner"><span id="bannerText"></span><button class="sm" id="retryBtn">Retry</button></div>
 
-  <!-- ============ JOB OPENINGS ============ -->
+
   <section id="view-dashboard" class="view show">
     <h2>Placement Dashboard</h2>
     <p class="sub">Live numbers from the database and all job openings. Students apply from here.</p>
@@ -147,7 +147,7 @@
     <div id="jobGrid" class="jobs"><div class="empty">Loading jobs from database...</div></div>
   </section>
 
-  <!-- ============ STUDENTS ============ -->
+  
   <section id="view-students" class="view">
     <h2>Students</h2>
     <p class="sub">Register a student and browse all student records (coordinator only).</p>
@@ -170,7 +170,7 @@
           </select>
         </div>
         <div class="tablewrap"><table>
-          <thead><tr><th>ID</th><th>Name</th><th>Dept</th><th class="num">CGPA</th><th class="num">Age</th><th>Status</th><th class="num">Applications</th><th>Placed</th></tr></thead>
+          <thead><tr><th>ID</th><th>Name</th><th>Dept</th><th class="num">CGPA</th><th class="num">Age</th><th>Status</th><th class="num">Applications</th><th>Placed at</th></tr></thead>
           <tbody id="stuBody"><tr><td colspan="8" class="empty">Loading...</td></tr></tbody>
         </table></div>
         <div class="hint" id="stuCount"></div>
@@ -198,7 +198,7 @@
     </div>
   </section>
 
-
+ 
   <section id="view-interviews" class="view">
     <h2>Interviews</h2>
     <p class="sub">Interviews are scheduled from the Applications tab. Record the outcome here.</p>
@@ -213,7 +213,7 @@
     </div>
   </section>
 
-  
+
   <section id="view-offers" class="view">
     <h2>Offers</h2>
     <p class="sub">Offers are issued from the Applications tab (selected candidates). The student's reply is recorded here.</p>
@@ -225,7 +225,7 @@
     </div>
   </section>
 
-
+  
   <section id="view-reports" class="view">
     <h2>Reports</h2>
     <p class="sub">Seven analytical queries run live on the database.</p>
@@ -236,7 +236,7 @@
     </div>
   </section>
 
-
+  
   <section id="view-activity" class="view">
     <h2>Activity Log</h2>
     <p class="sub">Every change of application status is recorded automatically by a database trigger.</p>
@@ -247,7 +247,22 @@
       </table></div>
     </div>
   </section>
+  
+  <section id="view-setup" class="view">
+    <h2>Set-up (coordinator)</h2>
+    <p class="sub">Create the master data first: stages with their maximum score, companies, drives, job openings and interviewers. Students can apply only after a job opening exists.</p>
+    <div class="layout2" style="grid-template-columns:1fr 1fr">
+      <div id="setupGrid" style="display:grid;gap:16px"></div>
+      <div style="display:grid;gap:16px;align-content:start">
+        <div class="card"><h3 style="margin-top:0">Existing selection stages</h3>
+          <div class="tablewrap"><table><thead><tr><th>ID</th><th>Stage</th><th>Type</th><th class="num">Max score</th></tr></thead><tbody id="stageList"></tbody></table></div></div>
+        <div class="card"><h3 style="margin-top:0">Existing drives</h3>
+          <div class="tablewrap"><table><thead><tr><th>ID</th><th>Company</th><th>Date</th><th>Status</th></tr></thead><tbody id="driveList"></tbody></table></div></div>
+      </div>
+    </div>
+  </section>
 
+  
   <section id="view-myapps" class="view">
     <h2>My Applications</h2>
     <p class="sub">Follow your applications. The placement coordinator updates the status after each test and interview.</p>
@@ -296,7 +311,7 @@
     <div class="ltabs" id="loginTabs">
       <button type="button" data-lt="student" class="active">Student login</button>
       <button type="button" data-lt="register">New student</button>
-      <button type="button" data-lt="admin">Coordinator</button>
+      <button type="button" data-lt="admin">Staff login</button>
     </div>
     <form id="studentLogin" class="lpanel show" autocomplete="off">
       <div class="fg"><label for="l_id">Student ID</label><input id="l_id" type="number" min="1" required placeholder="e.g. 101"></div>
@@ -308,8 +323,14 @@
       <button type="submit" id="regSubmit" style="width:100%">Register</button>
     </form>
     <form id="adminLogin" class="lpanel" autocomplete="off">
-      <div class="fg"><label for="l_pw">Coordinator password</label><input id="l_pw" type="password" required></div>
-      <button type="submit" style="width:100%">Log in as coordinator</button>
+      <div class="fg"><label for="l_role">I am a</label>
+        <select id="l_role"><option value="admin">Placement coordinator</option><option value="interviewer">Interviewer</option></select></div>
+      <div id="grpPw" class="fg"><label for="l_pw">Coordinator password</label><input id="l_pw" type="password" required></div>
+      <div id="grpEmail" style="display:none">
+        <div class="fg"><label for="l_email">Interviewer email</label><input id="l_email" type="email"></div>
+        <div class="fg"><label for="l_phone">Phone number</label><input id="l_phone"><div class="hint">Your phone number is your password.</div></div>
+      </div>
+      <button type="submit" style="width:100%">Log in</button>
     </form>
     <div id="loginMsg"></div>
   </div>
@@ -343,12 +364,14 @@ let session = null;
 try { session = JSON.parse(sessionStorage.getItem('hirelink_session') || 'null'); } catch (e) { session = null; }
 const isAdmin = () => !!session && session.role === 'admin';
 const isStudent = () => !!session && session.role === 'student';
+const isInterviewer = () => !!session && session.role === 'interviewer';
 function saveSession(x) {
   session = x;
   if (x) sessionStorage.setItem('hirelink_session', JSON.stringify(x)); else sessionStorage.removeItem('hirelink_session');
 }
-const ADMIN_VIEWS = [['dashboard', 'Job Openings'], ['students', 'Students'], ['applications', 'Applications'],
+const ADMIN_VIEWS = [['dashboard', 'Job Openings'], ['setup', 'Set-up'], ['students', 'Students'], ['applications', 'Applications'],
                      ['interviews', 'Interviews'], ['offers', 'Offers'], ['reports', 'Reports'], ['activity', 'Activity Log']];
+const INTERVIEWER_VIEWS = [['interviews', 'My Interviews']];
 const STUDENT_VIEWS = [['dashboard', 'Job Openings'], ['myapps', 'My Applications'], ['myint', 'My Interviews'],
                        ['myoffers', 'My Offers'], ['profile', 'My Profile']];
 
@@ -375,6 +398,7 @@ const REPORTS = [
   { n: 6, title: 'Skill demand vs supply', desc: 'Jobs requiring a skill versus students who have it.' },
   { n: 7, title: 'Interviewer workload', desc: 'Interviews handled by each interviewer and their results.' }
 ];
+
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g,
@@ -449,6 +473,8 @@ async function refreshAll() {
         api('/jobs'), api('/me'), api('/my/applications'), api('/my/interviews'), api('/my/offers')
       ]);
       Object.assign(state, { jobs, me: me[0] || null, myApps, myInt, myOffers });
+    } else if (isInterviewer()) {
+      state.interviews = await api('/interviews');
     } else { return; }
     hideBanner();
     renderAll();
@@ -459,6 +485,7 @@ async function ensureLookups() {
   if (!state.stages) state.stages = await api('/stages');
   if (!state.interviewers) state.interviewers = await api('/interviewers');
 }
+
 
 let modalSubmit = null;
 function openModal(opts) {
@@ -502,16 +529,17 @@ const optionList = (items, valueKey, labelFn) => items.map(i => `<option value="
 
 
 function buildNav() {
-  const list = isAdmin() ? ADMIN_VIEWS : STUDENT_VIEWS;
+  const list = isAdmin() ? ADMIN_VIEWS : isInterviewer() ? INTERVIEWER_VIEWS : STUDENT_VIEWS;
   $('nav').innerHTML = list.map(v => `<button data-view="${v[0]}">${v[1]}</button>`).join('');
 }
 function showView(name) {
-  const allowed = (isAdmin() ? ADMIN_VIEWS : isStudent() ? STUDENT_VIEWS : []).map(v => v[0]);
-  if (!allowed.includes(name)) name = 'dashboard';
+  const allowed = (isAdmin() ? ADMIN_VIEWS : isStudent() ? STUDENT_VIEWS : isInterviewer() ? INTERVIEWER_VIEWS : []).map(v => v[0]);
+  if (!allowed.includes(name)) name = allowed[0] || 'dashboard';
   state.view = name;
   document.querySelectorAll('.view').forEach(s => s.classList.toggle('show', s.id === 'view-' + name));
   document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('active', b.dataset.view === name));
   if (name === 'activity' && isAdmin()) loadActivity();
+  if (name === 'setup' && isAdmin()) loadSetupLists();
 }
 $('nav').addEventListener('click', e => { const b = e.target.closest('button[data-view]'); if (b) showView(b.dataset.view); });
 $('retryBtn').addEventListener('click', refreshAll);
@@ -576,10 +604,11 @@ function renderStudents() {
   $('stuBody').innerHTML = list.length ? list.map(s => `<tr>
       <td>${esc(s.student_id)}</td><td>${esc(s.first_name)} ${esc(s.last_name)}</td><td>${esc(s.dept_code)}</td>
       <td class="num">${Number(s.cgpa).toFixed(2)}</td><td class="num">${esc(s.age)}</td><td>${badge(s.academic_status)}</td>
-      <td class="num">${esc(s.total_applications)}</td><td>${Number(s.offers_accepted) > 0 ? badge('accepted') : '-'}</td></tr>`).join('')
+      <td class="num">${esc(s.total_applications)}</td><td>${s.placed_company ? `<span class="badge b-green">${esc(s.placed_company)}</span>` : '-'}</td></tr>`).join('')
     : '<tr><td colspan="8" class="empty">No students match.</td></tr>';
   $('stuCount').textContent = list.length + ' of ' + state.students.length + ' students shown';
 }
+
 
 function appActions(a) {
   const id = Number(a.application_id), b = [];
@@ -616,7 +645,7 @@ function renderInterviews() {
   const list = state.interviews.filter(i => !f || (f === 'scheduled' ? i.result === 'scheduled' : i.result !== 'scheduled'));
   $('ivBody').innerHTML = list.length ? list.map(i => `<tr>
       <td>#${esc(i.interview_id)}</td>
-      <td>${esc(i.student_name)}<div class="hint">Application #${esc(i.application_id)}</div></td>
+      <td>${esc(i.student_name)}<div class="hint">CGPA ${esc(i.cgpa)} | ${esc(i.dept_code)} | Application #${esc(i.application_id)}</div></td>
       <td>${esc(i.job_title)}<div class="hint">${esc(i.company_name)}</div></td>
       <td>${fmtDate(i.interview_date)}</td><td>${fmtTime(i.start_time)} - ${fmtTime(i.end_time)}</td>
       <td>${esc(i.interview_mode)}<div class="hint">${esc(i.venue_or_link)}</div></td>
@@ -668,10 +697,16 @@ function renderProfile() {
   const m = state.me; if (!m) { $('profileCard').textContent = 'Loading...'; return; }
   const rows = [['Student ID', m.student_id], ['Name', m.first_name + ' ' + m.last_name], ['Email', m.email], ['Gender', m.gender],
                 ['Age', m.age], ['CGPA', Number(m.cgpa).toFixed(2)], ['Department', m.dept_code], ['Program', m.program_code],
-                ['Academic status', m.academic_status], ['Applications made', m.total_applications], ['Offers accepted', m.offers_accepted]];
+                ['Academic status', m.academic_status], ['Applications made', m.total_applications], ['Offers accepted', m.offers_accepted], ['Placed at', m.placed_company || 'Not placed yet']];
   $('profileCard').innerHTML = '<dl>' + rows.map(r => `<dt>${esc(r[0])}</dt><dd>${esc(r[1])}</dd>`).join('') + '</dl>';
 }
 function renderAll() {
+  if (isInterviewer()) {
+    $('view-interviews').querySelector('h2').textContent = 'My Interviews';
+    $('view-interviews').querySelector('.sub').textContent = 'Interviews assigned to you. After each interview record whether the candidate passed.';
+    renderInterviews();
+    return;
+  }
   if (isStudent()) {
     $('kpis').style.display = 'none';
     $('view-dashboard').querySelector('h2').textContent = 'Job Openings';
@@ -694,6 +729,7 @@ async function loadActivity() {
   } catch (e) { $('logBody').innerHTML = `<tr><td colspan="6" class="empty">${esc(e.message)}</td></tr>`; }
 }
 
+/* ---------- reports ---------- */
 function renderReportButtons() {
   $('reportBtns').innerHTML = REPORTS.map(r =>
     `<button class="rbtn" id="rbtn${r.n}" data-act="report" data-id="${r.n}"><b>${r.n}. ${esc(r.title)}</b><span>${esc(r.desc)}</span></button>`).join('');
@@ -794,7 +830,17 @@ async function doLogin(body) {
   } catch (err) { loginMsg(err.message, 'err'); }
 }
 $('studentLogin').addEventListener('submit', e => { e.preventDefault(); doLogin({ role: 'student', student_id: v('l_id'), dob: v('l_dob') }); });
-$('adminLogin').addEventListener('submit', e => { e.preventDefault(); doLogin({ role: 'admin', password: v('l_pw') }); });
+function syncRoleFields() {
+  const iv = v('l_role') === 'interviewer';
+  $('grpPw').style.display = iv ? 'none' : ''; $('grpEmail').style.display = iv ? '' : 'none';
+  $('l_pw').required = !iv; $('l_email').required = iv; $('l_phone').required = iv;
+}
+$('l_role').addEventListener('change', syncRoleFields);
+$('adminLogin').addEventListener('submit', e => {
+  e.preventDefault();
+  if (v('l_role') === 'interviewer') doLogin({ role: 'interviewer', email: v('l_email'), phone: v('l_phone') });
+  else doLogin({ role: 'admin', password: v('l_pw') });
+});
 $('registerForm').addEventListener('submit', async e => {
   e.preventDefault();
   const btn = $('regSubmit'); btn.disabled = true;
@@ -813,9 +859,9 @@ function startApp() {
   document.body.classList.toggle('role-admin', isAdmin());
   document.body.classList.toggle('role-student', isStudent());
   $('loginScreen').classList.remove('show');
-  $('whoName').textContent = session.name + (isAdmin() ? ' (coordinator)' : ' (student)');
+  $('whoName').textContent = session.name + (isAdmin() ? ' (coordinator)' : isInterviewer() ? ' (interviewer)' : ' (student)');
   buildNav();
-  showView('dashboard');
+  showView(isInterviewer() ? 'interviews' : 'dashboard');
   refreshAll();
 }
 function logout(message) {
@@ -827,6 +873,7 @@ function logout(message) {
   loginMsg(message || '', message ? 'err' : '');
 }
 $('logoutBtn').addEventListener('click', () => logout(''));
+
 
 function openApply(jobId) {
   const job = state.jobs.find(j => Number(j.job_id) === jobId); if (!job) return;
@@ -895,7 +942,16 @@ async function openSchedule(appId) {
         <div class="fg"><label for="f_start">Start time</label><input id="f_start" type="time" required value="10:00"></div>
         <div class="fg"><label for="f_end">End time</label><input id="f_end" type="time" required value="11:00"></div>
       </div>
-      <div class="fg"><label for="f_venue">Venue or meeting link</label><input id="f_venue" maxlength="255" placeholder="Placement Cell Room 2 / meeting link"></div>`,
+      <div class="fg"><label for="f_venue" id="f_venuelbl">Meeting link</label><input id="f_venue" maxlength="255" placeholder="https://meet.example.com/..."></div>`,
+    onOpen: () => {
+      const sync = () => {
+        const off = v('f_mode') === 'Offline';
+        $('f_venuelbl').textContent = off ? 'Venue (building, room, address)' : 'Meeting link';
+        $('f_venue').placeholder = off ? 'e.g. Placement Cell, Room 204, Main Block' : 'https://meet.example.com/...';
+        $('f_venue').required = off;
+      };
+      $('f_mode').addEventListener('change', sync); sync();
+    },
     onSubmit: () => runAction('/schedule-interview', {
       application_id: appId, interview_date: v('f_date'), start_time: v('f_start'), end_time: v('f_end'),
       interview_mode: v('f_mode'), venue_or_link: v('f_venue'), interviewer_id: v('f_iv')
@@ -961,6 +1017,70 @@ document.addEventListener('click', e => {
 ['stuSearch', 'stuFilter'].forEach(i => $(i).addEventListener('input', renderStudents));
 ['appSearch', 'appStatus'].forEach(i => $(i).addEventListener('input', renderApplications));
 $('ivFilter').addEventListener('input', renderInterviews);
+
+
+
+const SETUP_FORMS = [
+  { key: 'stage', title: '1. Selection stage', path: '/stages', hint: 'Define the maximum score here. The database then blocks any score above it.',
+    fields: [{ id: 'stage_name', label: 'Stage name', req: 1, ph: 'e.g. Group Discussion' },
+             { id: 'stage_type', label: 'Type', options: ['Written/Online', 'Practical Test', 'Interview'] },
+             { id: 'max_score', label: 'Maximum score', type: 'number', req: 1, ph: 'e.g. 100' }] },
+  { key: 'company', title: '2. Company', path: '/companies',
+    fields: [{ id: 'company_name', label: 'Company name', req: 1 }, { id: 'industry', label: 'Industry' }, { id: 'website', label: 'Website' },
+             { id: 'email', label: 'Email', type: 'email' }, { id: 'phone_number', label: 'Phone' }, { id: 'headquarters', label: 'Headquarters' }] },
+  { key: 'drive', title: '3. Recruitment drive', path: '/drives',
+    fields: [{ id: 'company_id', label: 'Company', lookup: 'companies', req: 1 }, { id: 'academic_year', label: 'Academic year', req: 1, ph: '2026-2027' },
+             { id: 'reg_start_date', label: 'Registration starts', type: 'date', req: 1 }, { id: 'reg_end_date', label: 'Registration ends', type: 'date', req: 1 },
+             { id: 'drive_date', label: 'Drive date', type: 'date', req: 1 }, { id: 'venue', label: 'Venue' },
+             { id: 'drive_mode', label: 'Mode', options: ['offline', 'online'], req: 1 }] },
+  { key: 'job', title: '4. Job opening (also internships)', path: '/jobs', hint: 'Students from any department can apply if their CGPA meets the minimum.',
+    fields: [{ id: 'drive_id', label: 'Recruitment drive', lookup: 'drives', req: 1 }, { id: 'job_title', label: 'Job title', req: 1 },
+             { id: 'job_description', label: 'Description' }, { id: 'employment_type', label: 'Type', options: ['Full-Time', 'Internship'] },
+             { id: 'work_location', label: 'Work location' }, { id: 'vacancies', label: 'Vacancies', type: 'number', req: 1 },
+             { id: 'min_cgpa', label: 'Minimum CGPA', type: 'number', ph: 'e.g. 7.00' }, { id: 'salary_package', label: 'Package (per year)', type: 'number' }] },
+  { key: 'interviewer', title: '5. Interviewer', path: '/interviewers', hint: 'The interviewer logs in with this email and phone number.',
+    fields: [{ id: 'company_id', label: 'Company', lookup: 'companies', req: 1 }, { id: 'interviewer_name', label: 'Name', req: 1 },
+             { id: 'email', label: 'Email', type: 'email', req: 1 }, { id: 'designation', label: 'Designation' }, { id: 'phone_number', label: 'Phone', req: 1 }] }
+];
+function setupFieldHTML(f, key) {
+  const id = 'su_' + key + '_' + f.id, req = f.req ? ' required' : '';
+  let input;
+  if (f.lookup) input = `<select id="${id}" data-lookup="${f.lookup}"${req}></select>`;
+  else if (f.options) input = `<select id="${id}"${req}>${f.options.map(o => `<option>${esc(o)}</option>`).join('')}</select>`;
+  else input = `<input id="${id}" type="${f.type || 'text'}" ${f.type === 'number' ? 'step="any" min="0"' : ''} placeholder="${esc(f.ph || '')}"${req}>`;
+  return `<div class="fg"><label for="${id}">${esc(f.label)}${f.req ? ' *' : ''}</label>${input}</div>`;
+}
+function renderSetupForms() {
+  $('setupGrid').innerHTML = SETUP_FORMS.map(f => `<div class="card"><h3 style="margin-top:0">${esc(f.title)}</h3>
+      ${f.hint ? `<div class="hint" style="margin:-6px 0 10px">${esc(f.hint)}</div>` : ''}
+      <form data-setup="${f.key}" autocomplete="off">${f.fields.map(x => setupFieldHTML(x, f.key)).join('')}
+      <button type="submit" style="width:100%">Add</button></form></div>`).join('');
+}
+async function loadSetupLists() {
+  try {
+    const [companies, drives, stages] = await Promise.all([api('/companies'), api('/drives'), api('/stages')]);
+    document.querySelectorAll('#setupGrid select[data-lookup="companies"]').forEach(sel => {
+      const keep = sel.value; sel.innerHTML = companies.map(c => `<option value="${esc(c.company_id)}">${esc(c.company_name)}</option>`).join(''); if (keep) sel.value = keep; });
+    document.querySelectorAll('#setupGrid select[data-lookup="drives"]').forEach(sel => {
+      const keep = sel.value; sel.innerHTML = drives.map(d => `<option value="${esc(d.drive_id)}">#${esc(d.drive_id)} ${esc(d.company_name)} (${fmtDate(d.drive_date)}, ${esc(d.drive_status)})</option>`).join(''); if (keep) sel.value = keep; });
+    $('stageList').innerHTML = stages.map(x => `<tr><td>${esc(x.stage_id)}</td><td>${esc(x.stage_name)}</td><td>${esc(x.stage_type)}</td><td class="num">${esc(x.max_score)}</td></tr>`).join('');
+    $('driveList').innerHTML = drives.map(d => `<tr><td>${esc(d.drive_id)}</td><td>${esc(d.company_name)}</td><td>${fmtDate(d.drive_date)}</td><td>${badge(d.drive_status)}</td></tr>`).join('');
+    state.stages = null; state.interviewers = null;   // so the other dialogs reload them
+  } catch (e) { toast(e.message, 'err'); }
+}
+$('setupGrid').addEventListener('submit', async e => {
+  e.preventDefault();
+  const form = e.target, def = SETUP_FORMS.find(x => x.key === form.dataset.setup); if (!def) return;
+  const body = {}; def.fields.forEach(f => { body[f.id] = $('su_' + def.key + '_' + f.id).value; });
+  const btn = form.querySelector('button'); btn.disabled = true;
+  try {
+    const r = await post(def.path, body);
+    toast(r.message, 'ok'); form.reset();
+    await loadSetupLists(); await refreshAll();
+  } catch (err) { toast(err.message, 'err'); }
+  finally { btn.disabled = false; }
+});
+renderSetupForms();
 
 renderReportButtons();
 if (session) startApp();

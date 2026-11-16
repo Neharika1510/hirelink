@@ -1,22 +1,3 @@
--- HireLink Users, roles and privileges
-USE college_placement_internship;
-
-CREATE ROLE IF NOT EXISTS 'student_role';
-GRANT SELECT ON college_placement_internship.JOB_VACANCY_STATUS TO 'student_role';
-GRANT SELECT ON college_placement_internship.JOB_OPENING        TO 'student_role';
-GRANT SELECT ON college_placement_internship.VW_STUDENT_DETAILS TO 'student_role';
-
-CREATE ROLE IF NOT EXISTS 'coordinator_role';
-GRANT SELECT, INSERT, UPDATE ON college_placement_internship.* TO 'coordinator_role';
-GRANT EXECUTE ON college_placement_internship.* TO 'coordinator_role';
-
-CREATE USER IF NOT EXISTS 'admin_user'@'localhost'   IDENTIFIED BY 'ChangeMe_Admin1!';
-CREATE USER IF NOT EXISTS 'student_user'@'localhost' IDENTIFIED BY 'ChangeMe_Student1!';
-
-GRANT ALL PRIVILEGES ON college_placement_internship.* TO 'admin_user'@'localhost';
-GRANT 'student_role' TO 'student_user'@'localhost';
-SET DEFAULT ROLE 'student_role' TO 'student_user'@'localhost';
-
 USE college_placement_internship;
 
 DROP PROCEDURE IF EXISTS Proc_SubmitStudentApplication;
@@ -32,9 +13,7 @@ DROP PROCEDURE IF EXISTS Proc_CloseRecruitmentDrive;
 
 DELIMITER //
 
--- ---------------------------------------------------------------------
 -- 1. APPLY FOR A JOB
--- ---------------------------------------------------------------------
 CREATE PROCEDURE Proc_SubmitStudentApplication(
     IN p_student_id INT, IN p_job_id INT, IN p_resume_status VARCHAR(30), OUT p_message VARCHAR(255))
 BEGIN
@@ -44,14 +23,14 @@ BEGIN
     DECLARE v_min DECIMAL(4,2);
     DECLARE v_drive VARCHAR(20);
 
-    DECLARE EXIT HANDLER FOR SQLEXCEPTION                      -- PART 1
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION                      
     BEGIN
         GET DIAGNOSTICS CONDITION 1 v_err = MESSAGE_TEXT;
         ROLLBACK;
         SET p_message = CONCAT('ERROR: ', v_err);
     END;
 
-    START TRANSACTION;                                         -- PART 2
+    START TRANSACTION;                                         
     SELECT academic_status, cgpa INTO v_status, v_cgpa FROM STUDENT WHERE student_id = p_student_id;
     SELECT jo.min_cgpa, d.drive_status INTO v_min, v_drive
     FROM JOB_OPENING jo JOIN RECRUITMENT_DRIVE d ON d.drive_id = jo.drive_id WHERE jo.job_id = p_job_id;
@@ -79,16 +58,12 @@ BEGIN
     INSERT INTO APPLICATION (application_date, application_status, resume_submission_status, student_id, job_id)
     VALUES (CURDATE(), 'submitted', p_resume_status, p_student_id, p_job_id);
 
-    COMMIT;                                                    -- PART 3
+    COMMIT;                                                    
     SET p_message = 'SUCCESS: Application submitted.';
 END //
 
--- ---------------------------------------------------------------------
--- 2. RECORD STAGE RESULT  (Neharika)
--- One INSERT. Two triggers work inside the same transaction:
---   trg_validate_stage_score (BEFORE INSERT)  -> score must not exceed the stage maximum
---   trg_update_application_on_stage_result (AFTER INSERT) -> application becomes shortlisted / rejected
--- ---------------------------------------------------------------------
+
+-- 2. RECORD STAGE RESULT
 CREATE PROCEDURE Proc_RecordStageResult(
     IN p_application_id INT, IN p_stage_id INT, IN p_score DECIMAL(6,2),
     IN p_result VARCHAR(30), IN p_remarks VARCHAR(255), OUT p_message VARCHAR(255))
@@ -96,14 +71,14 @@ BEGIN
     DECLARE v_err VARCHAR(255);
     DECLARE v_status VARCHAR(20);
 
-    DECLARE EXIT HANDLER FOR SQLEXCEPTION                      -- PART 1
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION                      
     BEGIN
         GET DIAGNOSTICS CONDITION 1 v_err = MESSAGE_TEXT;
         ROLLBACK;
         SET p_message = CONCAT('ERROR: ', v_err);
     END;
 
-    START TRANSACTION;                                         -- PART 2
+    START TRANSACTION;                                         
     SELECT application_status INTO v_status FROM APPLICATION WHERE application_id = p_application_id FOR UPDATE;
 
     IF v_status IS NULL THEN
@@ -122,14 +97,11 @@ BEGIN
     INSERT INTO APPLICATION_STAGE (application_id, stage_id, stage_date, score, result, remarks)
     VALUES (p_application_id, p_stage_id, CURDATE(), p_score, p_result, NULLIF(p_remarks, ''));
 
-    COMMIT;                                                    -- PART 3
+    COMMIT;                                                    
     SET p_message = 'SUCCESS: Stage result saved. The application status was updated automatically.';
 END //
 
--- ---------------------------------------------------------------------
--- 3. RECORD INTERVIEW RESULT  (Neharika)
--- Two tables change together: INTERVIEW (the result) and APPLICATION (the status).
--- ---------------------------------------------------------------------
+-- 3. RECORD INTERVIEW RESULT 
 CREATE PROCEDURE Proc_RecordInterviewResult(
     IN p_interview_id INT, IN p_result VARCHAR(20), OUT p_message VARCHAR(255))
 BEGIN
@@ -137,14 +109,14 @@ BEGIN
     DECLARE v_app INT;
     DECLARE v_current VARCHAR(50);
 
-    DECLARE EXIT HANDLER FOR SQLEXCEPTION                      -- PART 1
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION                      
     BEGIN
         GET DIAGNOSTICS CONDITION 1 v_err = MESSAGE_TEXT;
         ROLLBACK;
         SET p_message = CONCAT('ERROR: ', v_err);
     END;
 
-    START TRANSACTION;                                         -- PART 2
+    START TRANSACTION;                                         
     SELECT application_id, result INTO v_app, v_current FROM INTERVIEW WHERE interview_id = p_interview_id FOR UPDATE;
 
     IF v_app IS NULL THEN
@@ -167,14 +139,11 @@ BEGIN
         WHERE application_id = v_app AND application_status IN ('submitted', 'shortlisted');
     END IF;
 
-    COMMIT;                                                    -- PART 3
+    COMMIT;                                                    
     SET p_message = CONCAT('SUCCESS: Interview result saved as ', p_result, '.');
 END //
 
--- ---------------------------------------------------------------------
--- 4. SCHEDULE INTERVIEW  (Krupalini)
--- INSERT into INTERVIEW and INTERVIEW_INTERVIEWER. Student clash = trigger; interviewer clash = here.
--- ---------------------------------------------------------------------
+-- 4. SCHEDULE INTERVIEW  
 CREATE PROCEDURE Proc_ScheduleInterview(
     IN p_application_id INT, IN p_date DATE, IN p_start TIME, IN p_end TIME,
     IN p_mode VARCHAR(30), IN p_venue VARCHAR(255), IN p_interviewer_id INT, OUT p_message VARCHAR(255))
@@ -183,14 +152,14 @@ BEGIN
     DECLARE v_status VARCHAR(20);
     DECLARE v_company INT;
 
-    DECLARE EXIT HANDLER FOR SQLEXCEPTION                      -- PART 1
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION                     
     BEGIN
         GET DIAGNOSTICS CONDITION 1 v_err = MESSAGE_TEXT;
         ROLLBACK;
         SET p_message = CONCAT('ERROR: ', v_err);
     END;
 
-    START TRANSACTION;                                         -- PART 2
+    START TRANSACTION;                                        
     SELECT application_status INTO v_status FROM APPLICATION WHERE application_id = p_application_id FOR UPDATE;
     SELECT d.company_id INTO v_company
     FROM APPLICATION a JOIN JOB_OPENING j ON j.job_id = a.job_id
@@ -216,27 +185,25 @@ BEGIN
 
     INSERT INTO INTERVIEW_INTERVIEWER (interview_id, interviewer_id) VALUES (LAST_INSERT_ID(), p_interviewer_id);
 
-    COMMIT;                                                    -- PART 3
+    COMMIT;                                                    
     SET p_message = 'SUCCESS: Interview scheduled.';
 END //
 
--- ---------------------------------------------------------------------
--- 5. SELECT CANDIDATE  (Krupalini)
--- ---------------------------------------------------------------------
+-- 5. SELECT CANDIDATE 
 CREATE PROCEDURE Proc_SelectCandidate(IN p_application_id INT, OUT p_message VARCHAR(255))
 BEGIN
     DECLARE v_err VARCHAR(255);
     DECLARE v_status VARCHAR(20);
     DECLARE v_job INT;
 
-    DECLARE EXIT HANDLER FOR SQLEXCEPTION                      -- PART 1
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION                      
     BEGIN
         GET DIAGNOSTICS CONDITION 1 v_err = MESSAGE_TEXT;
         ROLLBACK;
         SET p_message = CONCAT('ERROR: ', v_err);
     END;
 
-    START TRANSACTION;                                         -- PART 2
+    START TRANSACTION;                                        
     SELECT application_status, job_id INTO v_status, v_job FROM APPLICATION WHERE application_id = p_application_id FOR UPDATE;
 
     IF v_status IS NULL THEN
@@ -255,28 +222,25 @@ BEGIN
 
     UPDATE APPLICATION SET application_status = 'selected' WHERE application_id = p_application_id;
 
-    COMMIT;                                                    -- PART 3
+    COMMIT;                                                   
     SET p_message = 'SUCCESS: Candidate selected. You can now issue the offer.';
 END //
 
--- ---------------------------------------------------------------------
--- 6. ISSUE OFFER  (Krupalini)  - salary and location are copied from the job opening
--- The vacancy rule is enforced by trigger trg_check_vacancy_before_offer.
--- ---------------------------------------------------------------------
+-- 6. ISSUE OFFER  
 CREATE PROCEDURE Proc_IssueOffer(
     IN p_application_id INT, IN p_joining_date DATE, IN p_location VARCHAR(150), OUT p_message VARCHAR(255))
 BEGIN
     DECLARE v_err VARCHAR(255);
     DECLARE v_status VARCHAR(20);
 
-    DECLARE EXIT HANDLER FOR SQLEXCEPTION                      -- PART 1
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION                      
     BEGIN
         GET DIAGNOSTICS CONDITION 1 v_err = MESSAGE_TEXT;
         ROLLBACK;
         SET p_message = CONCAT('ERROR: ', v_err);
     END;
 
-    START TRANSACTION;                                         -- PART 2
+    START TRANSACTION;                                        
     SELECT application_status INTO v_status FROM APPLICATION WHERE application_id = p_application_id FOR UPDATE;
 
     IF v_status IS NULL THEN
@@ -294,13 +258,11 @@ BEGIN
     FROM APPLICATION a JOIN JOB_OPENING j ON j.job_id = a.job_id
     WHERE a.application_id = p_application_id;
 
-    COMMIT;                                                    -- PART 3
+    COMMIT;                                                    
     SET p_message = 'SUCCESS: Offer issued. It is waiting for the student''s reply.';
 END //
 
--- ---------------------------------------------------------------------
--- 7. ACCEPT OFFER  (Krupalini)   Rule: one student, one placement.
--- ---------------------------------------------------------------------
+-- 7. ACCEPT OFFER  (Krupalini)   
 CREATE PROCEDURE Proc_AcceptOffer(IN p_offer_id INT, OUT p_message VARCHAR(255))
 BEGIN
     DECLARE v_err VARCHAR(255);
@@ -308,14 +270,14 @@ BEGIN
     DECLARE v_app INT;
     DECLARE v_student INT;
 
-    DECLARE EXIT HANDLER FOR SQLEXCEPTION                      -- PART 1
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION                     
     BEGIN
         GET DIAGNOSTICS CONDITION 1 v_err = MESSAGE_TEXT;
         ROLLBACK;
         SET p_message = CONCAT('ERROR: ', v_err);
     END;
 
-    START TRANSACTION;                                         -- PART 2
+    START TRANSACTION;                                        
     SELECT o.job_status, o.application_id, a.student_id INTO v_status, v_app, v_student
     FROM OFFER o JOIN APPLICATION a ON a.application_id = o.application_id
     WHERE o.offer_id = p_offer_id FOR UPDATE;
@@ -340,27 +302,25 @@ BEGIN
     WHERE student_id = v_student AND application_id <> v_app
       AND application_status IN ('submitted', 'shortlisted', 'selected');
 
-    COMMIT;                                                    -- PART 3
+    COMMIT;                                                    
     SET p_message = 'SUCCESS: Offer accepted. The student''s other offers and applications were cancelled.';
 END //
 
--- ---------------------------------------------------------------------
--- 8. REJECT OFFER  (Dwithi)
--- ---------------------------------------------------------------------
+-- 8. REJECT OFFER 
 CREATE PROCEDURE Proc_RejectOffer(IN p_offer_id INT, OUT p_message VARCHAR(255))
 BEGIN
     DECLARE v_err VARCHAR(255);
     DECLARE v_status VARCHAR(20);
     DECLARE v_app INT;
 
-    DECLARE EXIT HANDLER FOR SQLEXCEPTION                      -- PART 1
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION                      
     BEGIN
         GET DIAGNOSTICS CONDITION 1 v_err = MESSAGE_TEXT;
         ROLLBACK;
         SET p_message = CONCAT('ERROR: ', v_err);
     END;
 
-    START TRANSACTION;                                         -- PART 2
+    START TRANSACTION;                                         
     SELECT job_status, application_id INTO v_status, v_app FROM OFFER WHERE offer_id = p_offer_id FOR UPDATE;
 
     IF v_status IS NULL THEN
@@ -373,26 +333,24 @@ BEGIN
     UPDATE OFFER SET job_status = 'rejected' WHERE offer_id = p_offer_id;
     UPDATE APPLICATION SET application_status = 'withdrawn' WHERE application_id = v_app;
 
-    COMMIT;                                                    -- PART 3
+    COMMIT;                                                    
     SET p_message = 'SUCCESS: Offer rejected. The vacancy is free again.';
 END //
 
--- ---------------------------------------------------------------------
--- 9. WITHDRAW APPLICATION  (Dwithi)
--- ---------------------------------------------------------------------
+-- 9. WITHDRAW APPLICATION  
 CREATE PROCEDURE Proc_WithdrawApplication(IN p_application_id INT, OUT p_message VARCHAR(255))
 BEGIN
     DECLARE v_err VARCHAR(255);
     DECLARE v_status VARCHAR(20);
 
-    DECLARE EXIT HANDLER FOR SQLEXCEPTION                      -- PART 1
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION                     
     BEGIN
         GET DIAGNOSTICS CONDITION 1 v_err = MESSAGE_TEXT;
         ROLLBACK;
         SET p_message = CONCAT('ERROR: ', v_err);
     END;
 
-    START TRANSACTION;                                         -- PART 2
+    START TRANSACTION;                                        
     SELECT application_status INTO v_status FROM APPLICATION WHERE application_id = p_application_id FOR UPDATE;
 
     IF v_status IS NULL THEN
@@ -409,26 +367,25 @@ BEGIN
     UPDATE INTERVIEW SET result = 'cancelled' WHERE application_id = p_application_id AND result = 'scheduled';
     UPDATE APPLICATION SET application_status = 'withdrawn' WHERE application_id = p_application_id;
 
-    COMMIT;                                                    -- PART 3
+    COMMIT;                                                    
     SET p_message = 'SUCCESS: Application withdrawn. Its pending offer and interview were cancelled.';
 END //
 
--- ---------------------------------------------------------------------
+
 -- 10. CLOSE A RECRUITMENT DRIVE
--- ---------------------------------------------------------------------
 CREATE PROCEDURE Proc_CloseRecruitmentDrive(IN p_drive_id INT, OUT p_message VARCHAR(255))
 BEGIN
     DECLARE v_err VARCHAR(255);
     DECLARE v_status VARCHAR(20);
 
-    DECLARE EXIT HANDLER FOR SQLEXCEPTION                      -- PART 1
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION                      
     BEGIN
         GET DIAGNOSTICS CONDITION 1 v_err = MESSAGE_TEXT;
         ROLLBACK;
         SET p_message = CONCAT('ERROR: ', v_err);
     END;
 
-    START TRANSACTION;                                         -- PART 2
+    START TRANSACTION;                                         
     SELECT drive_status INTO v_status FROM RECRUITMENT_DRIVE WHERE drive_id = p_drive_id FOR UPDATE;
 
     IF v_status IS NULL THEN
@@ -444,7 +401,7 @@ BEGIN
     SET a.application_status = 'rejected'
     WHERE jo.drive_id = p_drive_id AND a.application_status IN ('submitted', 'shortlisted');
 
-    COMMIT;                                                    -- PART 3
+    COMMIT;                                                    
     SET p_message = 'SUCCESS: Drive completed. Unfinished applications were closed as rejected.';
 END //
 

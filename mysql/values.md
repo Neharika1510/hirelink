@@ -1,10 +1,5 @@
--- =====================================================================
--- HireLink  |  02_seed.sql  |  Sample data (60 students, 6 drives, 8 jobs, full lifecycle)
--- Run AFTER 01_schema.sql and BEFORE 03_views_triggers.sql. Safe to run once on a fresh schema.
--- =====================================================================
 USE college_placement_internship;
 
--- Safety: the seed data must load without triggers (03_views_triggers.sql recreates them).
 DROP TRIGGER IF EXISTS trg_check_vacancy_before_offer;
 DROP TRIGGER IF EXISTS trg_validate_stage_score;
 DROP TRIGGER IF EXISTS trg_prevent_interview_time_overlap;

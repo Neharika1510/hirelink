@@ -205,10 +205,6 @@ CREATE TABLE DRIVE_COORDINATOR (
     FOREIGN KEY (coordinator_id) REFERENCES PLACEMENT_COORDINATOR(coordinator_id)
 );
 
--- ---------------------------------------------------------------------
--- EXTRA TABLE (not in the Assignment-4 design): audit trail filled by a trigger.
--- Mention it in the report as an enhancement.
--- ---------------------------------------------------------------------
 CREATE TABLE APPLICATION_STATUS_LOG (
     log_id         INT PRIMARY KEY AUTO_INCREMENT,
     application_id INT NOT NULL,

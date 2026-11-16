@@ -30,7 +30,6 @@ LEFT JOIN APPLICATION a ON a.student_id = s.student_id
 LEFT JOIN OFFER o       ON o.application_id = a.application_id
 GROUP BY s.student_id, s.first_name, s.last_name, s.dob;
 
--- filled_vacancies = offers that currently hold a seat (pending + accepted).
 
 CREATE OR REPLACE VIEW JOB_VACANCY_STATUS AS
 SELECT j.job_id, j.job_title,
@@ -52,9 +51,8 @@ DROP TRIGGER IF EXISTS trg_on_student_status_change;
 DROP TRIGGER IF EXISTS trg_student_program_matches_dept;
 DROP TRIGGER IF EXISTS trg_log_application_status;
 
+-- T1
 DELIMITER //
-
--- T1: an offer may only go to a SELECTED candidate and never above the job's vacancies
 CREATE TRIGGER trg_check_vacancy_before_offer
 BEFORE INSERT ON OFFER
 FOR EACH ROW
@@ -63,29 +61,26 @@ BEGIN
     DECLARE v_status VARCHAR(20);
     DECLARE v_vacancies INT;
     DECLARE v_offers_issued INT;
-
+    
     SELECT job_id, application_status INTO v_job_id, v_status
     FROM APPLICATION WHERE application_id = NEW.application_id;
-
     IF v_status IS NULL OR v_status <> 'selected' THEN
         SIGNAL SQLSTATE '45000'
         SET MESSAGE_TEXT = 'Offers can only be issued to candidates whose application is selected.';
     END IF;
-
+    
     SELECT vacancies INTO v_vacancies FROM JOB_OPENING WHERE job_id = v_job_id;
-
     SELECT COUNT(*) INTO v_offers_issued
     FROM OFFER o
     JOIN APPLICATION a ON a.application_id = o.application_id
     WHERE a.job_id = v_job_id AND o.job_status IN ('pending','accepted');
-
     IF v_offers_issued >= v_vacancies THEN
         SIGNAL SQLSTATE '45000'
         SET MESSAGE_TEXT = 'Cannot issue offer: all vacancies for this job opening are already filled or offered.';
     END IF;
 END //
 
--- T2: a stage score can never exceed the stage's maximum score
+-- T2
 CREATE TRIGGER trg_validate_stage_score
 BEFORE INSERT ON APPLICATION_STAGE
 FOR EACH ROW
@@ -100,7 +95,7 @@ BEGIN
     END IF;
 END //
 
--- T3: a student cannot have two interviews overlapping on the same day
+-- T3
 CREATE TRIGGER trg_prevent_interview_time_overlap
 BEFORE INSERT ON INTERVIEW
 FOR EACH ROW
@@ -125,7 +120,7 @@ BEGIN
     END IF;
 END //
 
--- T4: a recorded stage result automatically moves the application forward / out
+-- T4
 CREATE TRIGGER trg_update_application_on_stage_result
 AFTER INSERT ON APPLICATION_STAGE
 FOR EACH ROW
@@ -133,7 +128,9 @@ BEGIN
     IF NEW.result IN ('failed','rejected','disqualified') THEN
         UPDATE APPLICATION SET application_status = 'rejected'
         WHERE application_id = NEW.application_id
+        
           AND application_status IN ('submitted','shortlisted');
+          
     ELSEIF NEW.result IN ('passed','shortlisted') THEN
         UPDATE APPLICATION SET application_status = 'shortlisted'
         WHERE application_id = NEW.application_id
@@ -141,7 +138,7 @@ BEGIN
     END IF;
 END //
 
--- T5: when a student withdraws from college, their open applications and pending offers are cancelled
+-- T5
 CREATE TRIGGER trg_on_student_status_change
 AFTER UPDATE ON STUDENT
 FOR EACH ROW
@@ -159,7 +156,7 @@ BEGIN
     END IF;
 END //
 
--- T6: the degree program must belong to the student's department
+-- T6
 CREATE TRIGGER trg_student_program_matches_dept
 BEFORE INSERT ON STUDENT
 FOR EACH ROW
@@ -174,7 +171,7 @@ BEGIN
     END IF;
 END //
 
--- T7 (audit): every change of application_status is logged
+-- T7
 CREATE TRIGGER trg_log_application_status
 AFTER UPDATE ON APPLICATION
 FOR EACH ROW

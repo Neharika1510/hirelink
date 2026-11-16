@@ -6,14 +6,15 @@ const path = require('path');
 const app = express();
 app.use(cors());
 app.use(express.json());
-// deployment
+
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+
 
 const pool = mysql.createPool({
     host: process.env.DB_HOST || process.env.MYSQLHOST || 'localhost',
     port: Number(process.env.DB_PORT || process.env.MYSQLPORT || 3306),
     user: process.env.DB_USER || process.env.MYSQLUSER || 'root',
-    password: process.env.DB_PASSWORD || process.env.MYSQLPASSWORD || 'PUT_YOUR_MYSQL_PASSWORD_HERE',
+    password: process.env.DB_PASSWORD || process.env.MYSQLPASSWORD || 'password',
     database: process.env.DB_NAME || process.env.MYSQLDATABASE || 'college_placement_internship',
     ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
     waitForConnections: true,
@@ -51,6 +52,8 @@ function friendlyDbError(err) {
     return err.sqlMessage || err.message;
 }
 
+
+
 const crypto = require('crypto');
 const SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
@@ -79,11 +82,13 @@ app.use((req, res, next) => {
 });
 const needLogin = (req, res, next) =>
     req.user ? next() : res.status(401).json({ success: false, error: 'Please log in.' });
-const adminOnly = (req, res, next) => {
+
+const allow = (...roles) => (req, res, next) => {
     if (!req.user) return res.status(401).json({ success: false, error: 'Please log in.' });
-    if (req.user.role !== 'admin') return res.status(403).json({ success: false, error: 'Only the placement coordinator can do this.' });
+    if (!roles.includes(req.user.role)) return res.status(403).json({ success: false, error: 'Your role does not have permission for this.' });
     next();
 };
+const adminOnly = allow('admin');
 const attempts = new Map();   
 function tooManyAttempts(ip) {
     const now = Date.now(), list = (attempts.get(ip) || []).filter(t => now - t < 15 * 60 * 1000);
@@ -132,6 +137,7 @@ function reader(sql) {
     };
 }
 
+
 app.get('/api/jobs', needLogin, reader(`
     SELECT j.job_id, j.job_title, j.job_description, j.employment_type, j.work_location,
            j.vacancies, j.min_cgpa, j.salary_package, j.drive_id,
@@ -146,7 +152,11 @@ app.get('/api/jobs', needLogin, reader(`
 app.get('/api/students', adminOnly, reader(`
     SELECT v.student_id, v.first_name, v.last_name, v.age, v.gender, v.email, v.cgpa,
            v.academic_status, v.dept_code, v.program_code,
-           p.total_applications, p.offers_accepted
+           p.total_applications, p.offers_accepted,
+           (SELECT c.company_name FROM OFFER o JOIN APPLICATION a ON a.application_id = o.application_id
+              JOIN JOB_OPENING j ON j.job_id = a.job_id JOIN RECRUITMENT_DRIVE d ON d.drive_id = j.drive_id
+              JOIN COMPANY c ON c.company_id = d.company_id
+             WHERE a.student_id = v.student_id AND o.job_status = 'accepted' LIMIT 1) AS placed_company
     FROM VW_STUDENT_DETAILS v
     JOIN STUDENT_PLACEMENT_SUMMARY p ON p.student_id = v.student_id
     ORDER BY v.student_id`));
@@ -176,10 +186,22 @@ app.get('/api/offers', adminOnly, reader(`
     JOIN COMPANY c           ON c.company_id = d.company_id
     ORDER BY o.offer_id DESC`));
 
-// extra lookups used by the frontend forms
-app.get('/api/interviews', adminOnly, reader(`
+
+function scoped(build) {
+    return async (req, res) => {
+        try {
+            const q = build(req);
+            const [rows] = await pool.query(q.sql, q.params || []);
+            res.json(rows);
+        } catch (err) {
+            res.status(500).json({ success: false, error: friendlyDbError(err) });
+        }
+    };
+}
+const INT_SELECT = `
     SELECT i.interview_id, i.interview_date, i.start_time, i.end_time, i.interview_mode, i.venue_or_link, i.result,
-           a.application_id, CONCAT(s.first_name, ' ', s.last_name) AS student_name, j.job_title, c.company_name,
+           a.application_id, s.student_id, s.cgpa, s.dept_code, CONCAT(s.first_name, ' ', s.last_name) AS student_name,
+           j.job_title, c.company_name,
            GROUP_CONCAT(iv.interviewer_name SEPARATOR ', ') AS interviewers
     FROM INTERVIEW i
     JOIN APPLICATION a       ON a.application_id = i.application_id
@@ -188,10 +210,16 @@ app.get('/api/interviews', adminOnly, reader(`
     JOIN RECRUITMENT_DRIVE d ON d.drive_id = j.drive_id
     JOIN COMPANY c           ON c.company_id = d.company_id
     LEFT JOIN INTERVIEW_INTERVIEWER ii ON ii.interview_id = i.interview_id
-    LEFT JOIN INTERVIEWER iv           ON iv.interviewer_id = ii.interviewer_id
+    LEFT JOIN INTERVIEWER iv           ON iv.interviewer_id = ii.interviewer_id`;
+const INT_TAIL = `
     GROUP BY i.interview_id, i.interview_date, i.start_time, i.end_time, i.interview_mode, i.venue_or_link, i.result,
-             a.application_id, s.first_name, s.last_name, j.job_title, c.company_name
-    ORDER BY (i.result = 'scheduled') DESC, i.interview_date DESC, i.start_time`));
+             a.application_id, s.student_id, s.cgpa, s.dept_code, s.first_name, s.last_name, j.job_title, c.company_name
+    ORDER BY (i.result = 'scheduled') DESC, i.interview_date DESC, i.start_time`;
+app.get('/api/interviews', allow('admin', 'interviewer'), scoped(req => req.user.role === 'interviewer'
+    ? { sql: INT_SELECT + ' WHERE i.interview_id IN (SELECT interview_id FROM INTERVIEW_INTERVIEWER WHERE interviewer_id = ?) ' + INT_TAIL,
+        params: [req.user.interviewer_id] }
+    : { sql: INT_SELECT + INT_TAIL }));
+
 
 app.get('/api/interviewers', adminOnly, reader(`
     SELECT iv.interviewer_id, iv.interviewer_name, iv.designation, iv.company_id, c.company_name
@@ -304,6 +332,7 @@ app.get('/api/report/:n', adminOnly, async (req, res) => {
     }
 });
 
+
 app.post('/api/login', async (req, res) => {
     const ip = req.ip;
     try {
@@ -313,6 +342,13 @@ app.post('/api/login', async (req, res) => {
             if (!safeEqual(b.password || '', ADMIN_PASSWORD)) { noteFailure(ip); return res.status(401).json({ success: false, error: 'Wrong admin password.' }); }
             return res.json({ success: true, role: 'admin', name: 'Placement Coordinator',
                               token: sign({ role: 'admin', exp: Date.now() + 8 * 3600 * 1000 }) });
+        }
+        if (b.role === 'interviewer') {
+            const [r] = await pool.query('SELECT interviewer_id, interviewer_name FROM INTERVIEWER WHERE email = ? AND phone_number = ?',
+                                         [needText(b, 'email'), needText(b, 'phone')]);
+            if (!r.length) { noteFailure(ip); return res.status(401).json({ success: false, error: 'Interviewer email and phone do not match.' }); }
+            return res.json({ success: true, role: 'interviewer', name: r[0].interviewer_name,
+                              token: sign({ role: 'interviewer', interviewer_id: r[0].interviewer_id, exp: Date.now() + 8 * 3600 * 1000 }) });
         }
         const student_id = needInt(b, 'student_id');
         const dob = needText(b, 'dob');
@@ -325,6 +361,7 @@ app.post('/api/login', async (req, res) => {
         res.status(400).json({ success: false, error: friendlyDbError(err) });
     }
 });
+
 
 const studentOnly = (req, res, next) => {
     if (!req.user) return res.status(401).json({ success: false, error: 'Please log in.' });
@@ -343,7 +380,11 @@ function mine(sql) {
 }
 app.get('/api/me', studentOnly, mine(`
     SELECT v.student_id, v.first_name, v.last_name, v.age, v.gender, v.email, v.cgpa, v.academic_status,
-           v.dept_code, v.program_code, p.total_applications, p.offers_accepted
+           v.dept_code, v.program_code, p.total_applications, p.offers_accepted,
+           (SELECT c.company_name FROM OFFER o JOIN APPLICATION a ON a.application_id = o.application_id
+              JOIN JOB_OPENING j ON j.job_id = a.job_id JOIN RECRUITMENT_DRIVE d ON d.drive_id = j.drive_id
+              JOIN COMPANY c ON c.company_id = d.company_id
+             WHERE a.student_id = v.student_id AND o.job_status = 'accepted' LIMIT 1) AS placed_company
     FROM VW_STUDENT_DETAILS v JOIN STUDENT_PLACEMENT_SUMMARY p ON p.student_id = v.student_id
     WHERE v.student_id = ?`));
 
@@ -430,8 +471,7 @@ app.post('/api/add-student', async (req, res) => {
     }
 });
 
-
-app.post('/api/apply', needLogin, transaction('Proc_SubmitStudentApplication',
+app.post('/api/apply', allow('student', 'admin'), transaction('Proc_SubmitStudentApplication',
     (b, req) => [req.user.role === 'student' ? req.user.student_id : needInt(b, 'student_id'), needInt(b, 'job_id'), 'submitted']));
 
 app.post('/api/stage-result', adminOnly, transaction('Proc_RecordStageResult',
@@ -441,7 +481,16 @@ app.post('/api/schedule-interview', adminOnly, transaction('Proc_ScheduleIntervi
     b => [needInt(b, 'application_id'), needText(b, 'interview_date'), needText(b, 'start_time'), needText(b, 'end_time'),
           optText(b, 'interview_mode') || 'Online', optText(b, 'venue_or_link'), needInt(b, 'interviewer_id')]));
 
-app.post('/api/interview-result', adminOnly, transaction('Proc_RecordInterviewResult',
+async function canRecordInterview(req, res, next) {
+    if (req.user.role === 'admin') return next();
+    try {
+        const [r] = await pool.query('SELECT 1 FROM INTERVIEW_INTERVIEWER WHERE interview_id = ? AND interviewer_id = ?',
+                                     [needInt(req.body || {}, 'interview_id'), req.user.interviewer_id]);
+        if (r.length) return next();
+        return res.status(403).json({ success: false, error: 'This interview is not assigned to you.' });
+    } catch (err) { return res.status(400).json({ success: false, error: friendlyDbError(err) }); }
+}
+app.post('/api/interview-result', allow('admin', 'interviewer'), canRecordInterview, transaction('Proc_RecordInterviewResult',
     b => [needInt(b, 'interview_id'), needText(b, 'result')]));
 
 app.post('/api/select', adminOnly, transaction('Proc_SelectCandidate',
@@ -468,10 +517,68 @@ async function ownsApplication(req, res, next) {
         return res.status(403).json({ success: false, error: 'This application does not belong to you.' });
     } catch (err) { return res.status(400).json({ success: false, error: friendlyDbError(err) }); }
 }
-app.post('/api/accept-offer', needLogin, ownsOffer, transaction('Proc_AcceptOffer', b => [needInt(b, 'offer_id')]));
-app.post('/api/reject-offer', needLogin, ownsOffer, transaction('Proc_RejectOffer', b => [needInt(b, 'offer_id')]));
-app.post('/api/withdraw', needLogin, ownsApplication, transaction('Proc_WithdrawApplication', b => [needInt(b, 'application_id')]));
+app.post('/api/accept-offer', allow('student', 'admin'), ownsOffer, transaction('Proc_AcceptOffer', b => [needInt(b, 'offer_id')]));
+app.post('/api/reject-offer', allow('student', 'admin'), ownsOffer, transaction('Proc_RejectOffer', b => [needInt(b, 'offer_id')]));
+app.post('/api/withdraw', allow('student', 'admin'), ownsApplication, transaction('Proc_WithdrawApplication', b => [needInt(b, 'application_id')]));
 app.post('/api/close-drive', adminOnly, transaction('Proc_CloseRecruitmentDrive', b => [needInt(b, 'drive_id')]));
+
+
+
+function cleanFields(body, spec) {
+    const out = {};
+    for (const f of spec) {
+        const raw = body[f.col];
+        const empty = raw === undefined || raw === null || String(raw).trim() === '';
+        if (empty) { if (f.required) throw new BadRequest(`${f.label} is required.`); continue; }
+        const val = String(raw).trim();
+        if (f.type === 'int') { const n = Number.parseInt(val, 10); if (Number.isNaN(n)) throw new BadRequest(`${f.label} must be a whole number.`); out[f.col] = n; }
+        else if (f.type === 'num') { const n = Number.parseFloat(val); if (Number.isNaN(n)) throw new BadRequest(`${f.label} must be a number.`); out[f.col] = n; }
+        else if (f.options) { if (!f.options.includes(val)) throw new BadRequest(`${f.label} must be one of: ${f.options.join(', ')}.`); out[f.col] = val; }
+        else out[f.col] = val;
+    }
+    return out;
+}
+function createRoute(path, table, spec, label) {
+    app.post(path, adminOnly, async (req, res) => {
+        try {
+            const row = cleanFields(req.body || {}, spec);
+            const [r] = await pool.query('INSERT INTO ?? SET ?', [table, row]);
+            res.json({ success: true, id: r.insertId, message: `${label} added successfully${r.insertId ? ' (ID ' + r.insertId + ')' : ''}.` });
+        } catch (err) { res.status(400).json({ success: false, error: friendlyDbError(err) }); }
+    });
+}
+createRoute('/api/companies', 'COMPANY', [
+    { col: 'company_name', label: 'Company name', required: true }, { col: 'industry', label: 'Industry' },
+    { col: 'website', label: 'Website' }, { col: 'email', label: 'Email' },
+    { col: 'phone_number', label: 'Phone' }, { col: 'headquarters', label: 'Headquarters' }], 'Company');
+createRoute('/api/drives', 'RECRUITMENT_DRIVE', [
+    { col: 'company_id', label: 'Company', type: 'int', required: true }, { col: 'academic_year', label: 'Academic year', required: true },
+    { col: 'reg_start_date', label: 'Registration start', required: true }, { col: 'reg_end_date', label: 'Registration end', required: true },
+    { col: 'drive_date', label: 'Drive date', required: true }, { col: 'venue', label: 'Venue' },
+    { col: 'drive_mode', label: 'Mode', required: true, options: ['online', 'offline'] }], 'Recruitment drive');
+createRoute('/api/jobs', 'JOB_OPENING', [
+    { col: 'drive_id', label: 'Drive', type: 'int', required: true }, { col: 'job_title', label: 'Job title', required: true },
+    { col: 'job_description', label: 'Description' }, { col: 'employment_type', label: 'Type' }, { col: 'work_location', label: 'Work location' },
+    { col: 'vacancies', label: 'Vacancies', type: 'int', required: true }, { col: 'min_cgpa', label: 'Minimum CGPA', type: 'num' },
+    { col: 'salary_package', label: 'Salary package', type: 'num' }], 'Job opening');
+createRoute('/api/interviewers', 'INTERVIEWER', [
+    { col: 'company_id', label: 'Company', type: 'int', required: true }, { col: 'interviewer_name', label: 'Name', required: true },
+    { col: 'email', label: 'Email', required: true }, { col: 'designation', label: 'Designation' }, { col: 'phone_number', label: 'Phone', required: true }], 'Interviewer');
+app.post('/api/stages', adminOnly, async (req, res) => {          // stage_id is not auto-numbered, so take the next free number
+    try {
+        const row = cleanFields(req.body || {}, [
+            { col: 'stage_name', label: 'Stage name', required: true }, { col: 'stage_type', label: 'Stage type' },
+            { col: 'max_score', label: 'Maximum score', type: 'num', required: true }]);
+        if (row.max_score <= 0) throw new BadRequest('Maximum score must be above zero.');
+        const [[m]] = await pool.query('SELECT IFNULL(MAX(stage_id), 0) + 1 AS next_id FROM SELECTION_STAGE');
+        await pool.query('INSERT INTO SELECTION_STAGE SET ?', [Object.assign({ stage_id: m.next_id }, row)]);
+        res.json({ success: true, id: m.next_id, message: `Selection stage added (ID ${m.next_id}, maximum score ${row.max_score}).` });
+    } catch (err) { res.status(400).json({ success: false, error: friendlyDbError(err) }); }
+});
+app.get('/api/companies', adminOnly, reader('SELECT company_id, company_name FROM COMPANY ORDER BY company_name'));
+app.get('/api/drives', adminOnly, reader(`SELECT d.drive_id, d.drive_status, d.drive_date, c.company_name
+                                          FROM RECRUITMENT_DRIVE d JOIN COMPANY c ON c.company_id = d.company_id ORDER BY d.drive_id DESC`));
+
 
 const PORT = process.env.PORT || 5000;
 pool.query('SELECT 1')
